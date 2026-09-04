@@ -1,0 +1,112 @@
+[
+  {
+    "id": "E1",
+    "title": "Two Sum Basics",
+    "difficulty": "Easy",
+    "type": "mcq",
+    "points": 100,
+    "text": "Which operation is the fastest way to find the value in a sorted array with O(log n) time complexity?",
+    "options": ["Linear scan", "Binary search", "Hash map lookup", "Bubble sort"],
+    "answer": "Binary search",
+    "tag": "Arrays"
+  },
+  {
+    "id": "E2",
+    "title": "Prime Check Logic",
+    "difficulty": "Easy",
+    "type": "mcq",
+    "points": 100,
+    "text": "A number is prime if it has exactly two positive divisors. Which of these is prime?",
+    "options": ["1", "9", "13", "21"],
+    "answer": "13",
+    "tag": "Math"
+  },
+  {
+    "id": "E3",
+    "title": "Find Max in Array",
+    "difficulty": "Easy",
+    "type": "fill",
+    "points": 100,
+    "text": "Complete the function that returns the largest value in an array.",
+    "starterCode": "function maxValue(nums) {\n  // TODO: return the maximum element in nums\n  return nums[0];\n}",
+    "answerSnippet": "Math.max(...nums)",
+    "tag": "Arrays"
+  },
+  {
+    "id": "E4",
+    "title": "Reverse String",
+    "difficulty": "Easy",
+    "type": "code",
+    "points": 100,
+    "text": "Write a function that reverses the characters in a string.",
+    "starterCode": "function reverseString(str) {\n  // Write your solution here\n}",
+    "answerSnippet": "split(\"\").reverse().join(\"\")",
+    "tag": "Strings"
+  },
+  {
+    "id": "M1",
+    "title": "Balanced Parentheses",
+    "difficulty": "Medium",
+    "type": "mcq",
+    "points": 250,
+    "text": "Which data structure is most suitable to validate matching parentheses in a string?",
+    "options": ["Queue", "Tree", "Stack", "Priority queue"],
+    "answer": "Stack",
+    "tag": "Stacks"
+  },
+  {
+    "id": "M2",
+    "title": "Sum of Even Numbers",
+    "difficulty": "Medium",
+    "type": "fill",
+    "points": 250,
+    "text": "Fill in the missing logic to sum only even numbers from an array.",
+    "starterCode": "function sumEven(nums) {\n  let total = 0;\n  for (let i = 0; i < nums.length; i++) {\n    // TODO: add nums[i] to total if it is even\n  }\n  return total;\n}",
+    "answerSnippet": "if (nums[i] % 2 === 0) total += nums[i];",
+    "tag": "Loops"
+  },
+  {
+    "id": "M3",
+    "title": "Longest Word",
+    "difficulty": "Medium",
+    "type": "code",
+    "points": 250,
+    "text": "Write a function that returns the longest word in a sentence.",
+    "starterCode": "function longestWord(sentence) {\n  // Write your solution here\n}",
+    "answerSnippet": "split(/\\s+/)",
+    "tag": "Strings"
+  },
+  {
+    "id": "H1",
+    "title": "Merge Sorted Arrays",
+    "difficulty": "Hard",
+    "type": "fill",
+    "points": 500,
+    "text": "Complete the function that merges two sorted arrays into one sorted array.",
+    "starterCode": "function mergeSorted(a, b) {\n  const merged = [];\n  let i = 0;\n  let j = 0;\n  while (i < a.length && j < b.length) {\n    // TODO: push the smaller value and advance the pointer\n  }\n  return merged.concat(a.slice(i), b.slice(j));\n}",
+    "answerSnippet": "if (a[i] <= b[j]) merged.push(a[i++]); else merged.push(b[j++]);",
+    "tag": "Arrays"
+  },
+  {
+    "id": "H2",
+    "title": "Top K Frequent",
+    "difficulty": "Hard",
+    "type": "code",
+    "points": 500,
+    "text": "Write a function that returns the k most frequent elements in descending order of frequency.",
+    "starterCode": "function topKFrequent(nums, k) {\n  // Write your solution here\n}",
+    "answerSnippet": "Map",
+    "tag": "Hashing"
+  },
+  {
+    "id": "H3",
+    "title": "Binary Search Tree Validation",
+    "difficulty": "Hard",
+    "type": "code",
+    "points": 500,
+    "text": "Write a function that checks whether a tree is a valid BST.",
+    "starterCode": "function isValidBST(root) {\n  // Write your solution here\n}",
+    "answerSnippet": "inorder",
+    "tag": "Trees"
+  }
+]

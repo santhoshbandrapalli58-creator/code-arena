@@ -1,0 +1,163 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Code Arena</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <div class="app-shell">
+      <header class="topbar">
+        <div>
+          <p class="eyebrow">Realtime Competitive Coding</p>
+          <h1>Code Arena</h1>
+        </div>
+        <div class="header-actions">
+          <span id="roomBadge" class="badge hidden">Room: --</span>
+          <button id="resetButton" class="secondary-btn">Reset</button>
+        </div>
+      </header>
+
+      <main id="adminView" class="panel">
+        <div class="panel-header">
+          <div>
+            <p class="eyebrow">Admin Dashboard</p>
+            <h2>Create a room</h2>
+          </div>
+        </div>
+
+        <div class="admin-grid">
+          <section class="create-room card">
+            <label>Timer Duration</label>
+            <div class="range-row">
+              <input id="timerInput" type="range" min="15" max="30" step="5" value="25" />
+              <span id="timerValue">25 min</span>
+            </div>
+
+            <label for="problemUpload">Upload problems.json</label>
+            <input id="problemUpload" type="file" accept="application/json" />
+
+            <label for="joinLinkInput">Room Join Link</label>
+            <div class="share-link-row">
+              <input id="joinLinkInput" type="text" readonly value="https://example.com/?room=ROOMCODE" />
+              <button id="copyJoinLinkButton" class="secondary-btn short-btn" type="button">Copy</button>
+            </div>
+
+            <button id="createRoomButton" class="primary-btn">Create Room</button>
+            <button id="startGameButton" class="primary-btn hidden">Start Game</button>
+          </section>
+
+          <section class="problem-preview card">
+            <p class="eyebrow">Problem set preview</p>
+            <div id="problemStats" class="stats-box">
+              <span>0 problems loaded</span>
+            </div>
+            <ul id="problemBreakdown" class="mini-list"></ul>
+          </section>
+        </div>
+      </main>
+
+      <main id="playerView" class="panel hidden">
+        <div class="panel-header">
+          <div>
+            <p class="eyebrow">Contestant Join</p>
+            <h2>Enter the arena</h2>
+          </div>
+        </div>
+
+        <div class="player-grid">
+          <section class="join-card card">
+            <label for="rollInput">Roll Number</label>
+            <input id="rollInput" type="text" placeholder="e.g. 22CS102" />
+
+            <label for="nameInput">Full Name</label>
+            <input id="nameInput" type="text" placeholder="e.g. Rahul Sharma" />
+
+            <label for="roomInput">Room Code</label>
+            <input id="roomInput" type="text" placeholder="e.g. X7K9P2" />
+
+            <button id="joinRoomButton" class="primary-btn">Join Lobby</button>
+          </section>
+
+          <section class="lobby-card card">
+            <p class="eyebrow">Lobby</p>
+            <div id="lobbyInfo" class="lobby-info">
+              <span>Waiting for room</span>
+            </div>
+            <ul id="playerList" class="player-list"></ul>
+          </section>
+        </div>
+      </main>
+
+      <main id="gameView" class="game-view hidden">
+        <aside class="sidebar panel">
+          <div class="panel-header compact">
+            <div>
+              <p class="eyebrow">Problem Board</p>
+              <h3>Challenges</h3>
+            </div>
+          </div>
+          <div class="sidebar-tools">
+            <select id="difficultyFilter">
+              <option value="all">All difficulties</option>
+              <option value="Easy">Easy</option>
+              <option value="Medium">Medium</option>
+              <option value="Hard">Hard</option>
+            </select>
+          </div>
+          <ul id="problemSidebar" class="problem-sidebar"></ul>
+        </aside>
+
+        <section class="arena panel">
+          <div class="arena-topbar">
+            <div class="arena-meta">
+              <span class="chip">Game Timer</span>
+              <strong id="countdownTimer">25:00</strong>
+            </div>
+            <div class="arena-meta">
+              <span class="chip">Room</span>
+              <strong id="activeRoomCode">X7K9P2</strong>
+            </div>
+          </div>
+
+          <div id="problemMap" class="problem-map"></div>
+        </section>
+
+        <aside class="leaderboard panel">
+          <div class="panel-header compact">
+            <div>
+              <p class="eyebrow">Live</p>
+              <h3>Leaderboard</h3>
+            </div>
+          </div>
+          <div id="leaderboardList" class="leaderboard-list"></div>
+          <div class="notification-box">
+            <p class="eyebrow">Notifications</p>
+            <ul id="notificationFeed" class="notification-feed"></ul>
+          </div>
+        </aside>
+      </main>
+
+      <section id="winnerView" class="winner-view hidden panel">
+        <div class="winner-card">
+          <p class="eyebrow">Final Results</p>
+          <h2 id="winnerTitle">Winner: Rahul</h2>
+          <div id="winnerRanking" class="winner-ranking"></div>
+        </div>
+      </section>
+    </div>
+
+    <div id="problemModal" class="modal hidden" aria-modal="true">
+      <div class="modal-content">
+        <button id="closeModal" class="close-btn" aria-label="Close">×</button>
+        <div id="problemModalContent"></div>
+      </div>
+    </div>
+
+    <script src="script.js"></script>
+  </body>
+</html>
