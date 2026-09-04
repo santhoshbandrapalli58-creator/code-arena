@@ -39,12 +39,12 @@
             </div>
 
             <label for="problemUpload">Upload problems.json</label>
-            <input id="problemUpload" type="file" accept="application/json" />
+            <button id="uploadBtn" class="secondary-btn">Upload problems.json</button>
 
             <label for="joinLinkInput">Room Join Link</label>
             <div class="share-link-row">
               <input id="joinLinkInput" type="text" readonly value="https://example.com/?room=ROOMCODE" />
-              <button id="copyJoinLinkButton" class="secondary-btn short-btn" type="button">Copy</button>
+              <button id="copyBtn" class="secondary-btn short-btn" type="button">Copy</button>
             </div>
 
             <button id="createRoomButton" class="primary-btn">Create Room</button>
@@ -80,7 +80,7 @@
             <label for="roomInput">Room Code</label>
             <input id="roomInput" type="text" placeholder="e.g. X7K9P2" />
 
-            <button id="joinRoomButton" class="primary-btn">Join Lobby</button>
+            <button id="joinLobbyButton" class="primary-btn">Join Lobby</button>
           </section>
 
           <section class="lobby-card card">
@@ -153,11 +153,17 @@
 
     <div id="problemModal" class="modal hidden" aria-modal="true">
       <div class="modal-content">
-        <button id="closeModal" class="close-btn" aria-label="Close">×</button>
-        <div id="problemModalContent"></div>
+        <button id="closeModalButton" class="close-btn" aria-label="Close">×</button>
+        <div>
+          <h3 id="problemTitle">Problem Title</h3>
+          <p id="problemText">Problem description</p>
+          <div id="problemContent">Content goes here</div>
+          <button id="submitBtn" class="primary-btn">Submit</button>
+        </div>
       </div>
     </div>
 
+    <script src="/socket.io/socket.io.js"></script>
     <script src="script.js"></script>
   </body>
 </html>

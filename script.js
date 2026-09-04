@@ -1,859 +1,463 @@
-const defaultProblems = [
-  {
-    id: 'E1',
-    title: 'Two Sum Basics',
-    difficulty: 'Easy',
-    type: 'mcq',
-    points: 100,
-    text: 'Which operation is the fastest way to find the value in a sorted array with O(log n) time complexity?',
-    options: ['Linear scan', 'Binary search', 'Hash map lookup', 'Bubble sort'],
-    answer: 'Binary search',
-    tag: 'Arrays'
-  },
-  {
-    id: 'E2',
-    title: 'Prime Check Logic',
-    difficulty: 'Easy',
-    type: 'mcq',
-    points: 100,
-    text: 'A number is prime if it has exactly two positive divisors. Which of these is prime?',
-    options: ['1', '9', '13', '21'],
-    answer: '13',
-    tag: 'Math'
-  },
-  {
-    id: 'E3',
-    title: 'Find Max in Array',
-    difficulty: 'Easy',
-    type: 'fill',
-    points: 100,
-    text: 'Complete the function that returns the largest value in an array.',
-    starterCode: `function maxValue(nums) {
-  // TODO: return the maximum element in nums
-  return nums[0];
-}`,
-    answerSnippet: 'Math.max(...nums)',
-    tag: 'Arrays'
-  },
-  {
-    id: 'E4',
-    title: 'Reverse String',
-    difficulty: 'Easy',
-    type: 'code',
-    points: 100,
-    text: 'Write a function that reverses the characters in a string.',
-    starterCode: `function reverseString(str) {
-  // Write your solution here
-}`,
-    answerSnippet: 'split("").reverse().join("")',
-    tag: 'Strings'
-  },
-  {
-    id: 'M1',
-    title: 'Balanced Parentheses',
-    difficulty: 'Medium',
-    type: 'mcq',
-    points: 250,
-    text: 'Which data structure is most suitable to validate matching parentheses in a string?',
-    options: ['Queue', 'Tree', 'Stack', 'Priority queue'],
-    answer: 'Stack',
-    tag: 'Stacks'
-  },
-  {
-    id: 'M2',
-    title: 'Sum of Even Numbers',
-    difficulty: 'Medium',
-    type: 'fill',
-    points: 250,
-    text: 'Fill in the missing logic to sum only even numbers from an array.',
-    starterCode: `function sumEven(nums) {
-  let total = 0;
-  for (let i = 0; i < nums.length; i++) {
-    // TODO: add nums[i] to total if it is even
-  }
-  return total;
-}`,
-    answerSnippet: 'if (nums[i] % 2 === 0) total += nums[i];',
-    tag: 'Loops'
-  },
-  {
-    id: 'M3',
-    title: 'Longest Word',
-    difficulty: 'Medium',
-    type: 'code',
-    points: 250,
-    text: 'Write a function that returns the longest word in a sentence.',
-    starterCode: `function longestWord(sentence) {
-  // Write your solution here
-}`,
-    answerSnippet: 'split(/\\s+/)',
-    tag: 'Strings'
-  },
-  {
-    id: 'H1',
-    title: 'Merge Sorted Arrays',
-    difficulty: 'Hard',
-    type: 'fill',
-    points: 500,
-    text: 'Complete the function that merges two sorted arrays into one sorted array.',
-    starterCode: `function mergeSorted(a, b) {
-  const merged = [];
-  let i = 0;
-  let j = 0;
-  while (i < a.length && j < b.length) {
-    // TODO: push the smaller value and advance the pointer
-  }
-  return merged.concat(a.slice(i), b.slice(j));
-}`,
-    answerSnippet: 'if (a[i] <= b[j]) merged.push(a[i++]); else merged.push(b[j++]);',
-    tag: 'Arrays'
-  },
-  {
-    id: 'H2',
-    title: 'Top K Frequent',
-    difficulty: 'Hard',
-    type: 'code',
-    points: 500,
-    text: 'Write a function that returns the k most frequent elements in descending order of frequency.',
-    starterCode: `function topKFrequent(nums, k) {
-  // Write your solution here
-}`,
-    answerSnippet: 'Map',
-    tag: 'Hashing'
-  },
-  {
-    id: 'H3',
-    title: 'Binary Search Tree Validation',
-    difficulty: 'Hard',
-    type: 'code',
-    points: 500,
-    text: 'Write a function that checks whether a tree is a valid BST.',
-    starterCode: `function isValidBST(root) {
-  // Write your solution here
-}`,
-    answerSnippet: 'inorder',
-    tag: 'Trees'
-  }
-];
+// Socket.IO client for Code Arena multiplayer game
+const socket = (() => {
+  const s = io();
+  window.socket = s;  // Make globally accessible for debugging
+  return s;
+})();
 
-const BOARD_CONFIG = {
-  rows: 5,
-  cols: 8,
-  nodes: {
-    E1: { x: 1, y: 0 },
-    E2: { x: 0, y: 2 },
-    E3: { x: 4, y: 2 },
-    E4: { x: 2, y: 4 },
-    M1: { x: 5, y: 0 },
-    M2: { x: 3, y: 2 },
-    M3: { x: 0, y: 4 },
-    H1: { x: 3, y: 4 },
-    H2: { x: 5, y: 2 },
-    H3: { x: 7, y: 0 }
-  }
-};
-
+// Local state
 const state = {
   room: null,
   currentPlayer: null,
-  master: { name: 'Master', score: 0, solved: 0, wrong: 0, firstBloods: 0, role: 'master' },
-  players: [],
-  problems: structuredClone(defaultProblems),
-  countdown: 25 * 60,
-  gameStarted: false,
-  ended: false,
-  timerInterval: null,
-  leaderboardInterval: null,
+  isMaster: false,
+  problems: [],
   notifications: [],
   selectedProblem: null,
-  roomHistory: []
+  gameStarted: false,
+  gameEnded: false
 };
 
-const roomBadge = document.getElementById('roomBadge');
-const timerInput = document.getElementById('timerInput');
-const timerValue = document.getElementById('timerValue');
-const problemUpload = document.getElementById('problemUpload');
-const createRoomButton = document.getElementById('createRoomButton');
-const copyJoinLinkButton = document.getElementById('copyJoinLinkButton');
-const joinLinkInput = document.getElementById('joinLinkInput');
-const problemStats = document.getElementById('problemStats');
-const problemBreakdown = document.getElementById('problemBreakdown');
-const roomInput = document.getElementById('roomInput');
-const rollInput = document.getElementById('rollInput');
-const nameInput = document.getElementById('nameInput');
-const joinRoomButton = document.getElementById('joinRoomButton');
-const startGameButton = document.getElementById('startGameButton');
-const lobbyInfo = document.getElementById('lobbyInfo');
-const playerList = document.getElementById('playerList');
-const problemSidebar = document.getElementById('problemSidebar');
-const problemMap = document.getElementById('problemMap');
-const leaderboardList = document.getElementById('leaderboardList');
-const notificationFeed = document.getElementById('notificationFeed');
-const countdownTimer = document.getElementById('countdownTimer');
-const activeRoomCode = document.getElementById('activeRoomCode');
-const problemModal = document.getElementById('problemModal');
-const problemModalContent = document.getElementById('problemModalContent');
-const winnerView = document.getElementById('winnerView');
-const winnerTitle = document.getElementById('winnerTitle');
-const winnerRanking = document.getElementById('winnerRanking');
-const resetButton = document.getElementById('resetButton');
-const closeModalButton = document.getElementById('closeModal');
-const difficultyFilter = document.getElementById('difficultyFilter');
+// UI Element references (initialized in DOMContentLoaded)
+let adminView, playerView, gameView, winnerView;
+let timerInput, timerValue, uploadBtn, joinLinkInput, copyBtn, createRoomButton, startGameButton, roomBadge;
+let rollInput, nameInput, roomInput, joinLobbyButton;
+let playerList, problemSidebar, problemMap, leaderboardList, notificationFeed, countdownTimer;
+let problemModal, problemTitle, problemText, problemContent, closeModalButton, submitBtn, resetButton;
+let problemStats, problemBreakdown, activeRoomCode, winnerTitle, winnerRanking;
 
-function randomRoomCode() {
-  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
-  let code = '';
-  for (let i = 0; i < 6; i += 1) {
-    code += chars[Math.floor(Math.random() * chars.length)];
-  }
-  return code;
+function initializeUI() {
+  adminView = document.getElementById('adminView');
+  playerView = document.getElementById('playerView');
+  gameView = document.getElementById('gameView');
+  winnerView = document.getElementById('winnerView');
+
+  timerInput = document.getElementById('timerInput');
+  timerValue = document.getElementById('timerValue');
+  uploadBtn = document.getElementById('uploadBtn');
+  joinLinkInput = document.getElementById('joinLinkInput');
+  copyBtn = document.getElementById('copyBtn');
+  createRoomButton = document.getElementById('createRoomButton');
+  startGameButton = document.getElementById('startGameButton');
+  roomBadge = document.getElementById('roomBadge');
+
+  rollInput = document.getElementById('rollInput');
+  nameInput = document.getElementById('nameInput');
+  roomInput = document.getElementById('roomInput');
+  joinLobbyButton = document.getElementById('joinLobbyButton');
+
+  playerList = document.getElementById('playerList');
+  problemSidebar = document.getElementById('problemSidebar');
+  problemMap = document.getElementById('problemMap');
+  leaderboardList = document.getElementById('leaderboardList');
+  notificationFeed = document.getElementById('notificationFeed');
+  countdownTimer = document.getElementById('countdownTimer');
+  problemStats = document.getElementById('problemStats');
+  problemBreakdown = document.getElementById('problemBreakdown');
+  activeRoomCode = document.getElementById('activeRoomCode');
+  winnerTitle = document.getElementById('winnerTitle');
+  winnerRanking = document.getElementById('winnerRanking');
+
+  problemModal = document.getElementById('problemModal');
+  problemTitle = document.getElementById('problemTitle');
+  problemText = document.getElementById('problemText');
+  problemContent = document.getElementById('problemContent');
+  closeModalButton = document.getElementById('closeModalButton');
+  submitBtn = document.getElementById('submitBtn');
+  resetButton = document.getElementById('resetButton');
 }
 
-function getJoinLink(code) {
-  return `${window.location.origin}${window.location.pathname}?room=${encodeURIComponent(code)}`;
-}
-
-function loadRoomFromStorage(code) {
-  const raw = localStorage.getItem('codeArena.roomState');
-  if (!raw) return null;
-
+// Load problems from problems.json
+async function loadDefaultProblems() {
   try {
-    const roomState = JSON.parse(raw);
-    if (roomState.code !== code) return null;
-    return roomState;
-  } catch (error) {
-    return null;
+    const response = await fetch('problems.json');
+    if (response.ok) {
+      state.problems = await response.json();
+    }
+  } catch (err) {
+    console.error('Failed to load problems:', err);
   }
 }
 
-function persistRoomState() {
-  if (!state.room) return;
-
-  const payload = {
-    code: state.room.code,
-    timerMinutes: state.room.timerMinutes || Number(timerInput.value || 25),
-    started: state.gameStarted,
-    players: state.players,
-    countdown: state.countdown,
-    notifications: state.notifications,
-    problems: state.problems,
-    ended: state.ended
-  };
-
-  localStorage.setItem('codeArena.roomState', JSON.stringify(payload));
-}
-
-function setupJoinViewFromUrl() {
-  const roomCode = new URLSearchParams(window.location.search).get('room');
-  if (!roomCode) {
-    return false;
-  }
-
-  const normalizedCode = roomCode.trim().toUpperCase();
-  const storedRoom = loadRoomFromStorage(normalizedCode);
-  if (!storedRoom) {
-    state.room = { code: normalizedCode, timerMinutes: Number(timerInput.value) || 25, started: false };
-    state.players = [];
-    state.gameStarted = false;
-    state.countdown = 25 * 60;
-  } else {
-    state.room = { code: normalizedCode, timerMinutes: storedRoom.timerMinutes || 25, started: Boolean(storedRoom.started) };
-    state.players = storedRoom.players || [];
-    state.gameStarted = Boolean(storedRoom.started);
-    state.countdown = Number(storedRoom.countdown || (state.room.timerMinutes * 60));
-    state.notifications = storedRoom.notifications || [];
-    state.problems = Array.isArray(storedRoom.problems) && storedRoom.problems.length ? storedRoom.problems : structuredClone(defaultProblems);
-    state.ended = Boolean(storedRoom.ended);
-  }
-
-  roomInput.value = normalizedCode;
-  roomBadge.textContent = `Room: ${normalizedCode}`;
-  roomBadge.classList.remove('hidden');
-  activeRoomCode.textContent = normalizedCode;
-  document.getElementById('adminView').classList.add('hidden');
-  document.getElementById('playerView').classList.remove('hidden');
-
-  if (state.gameStarted) {
-    document.getElementById('gameView').classList.remove('hidden');
-    startGameButton.classList.add('hidden');
-    renderBoard();
-    renderSidebar();
-    renderLeaderboard();
-    countdownTimer.textContent = formatTimer(state.countdown);
-    renderLobby();
-    return true;
-  }
-
-  lobbyInfo.innerHTML = `<span>${state.players.length}/30 players joined</span><span>Waiting for Master to start...</span>`;
-  renderLobby();
-  return true;
-}
-
-function formatTimer(seconds) {
-  const mins = Math.floor(seconds / 60);
-  const secs = seconds % 60;
-  return `${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
-}
-
-function getProblemStats(problems) {
-  const summary = { Easy: 0, Medium: 0, Hard: 0 };
-  problems.forEach((problem) => {
-    summary[problem.difficulty] += 1;
-  });
-  const total = problems.reduce((sum, problem) => sum + problem.points, 0);
-  return { summary, total };
-}
-
+// Rendering functions
 function renderProblemPreview() {
-  const problems = state.problems;
-  if (!problems.length) {
-    problemStats.innerHTML = '<span>0 problems loaded</span>';
-    problemBreakdown.innerHTML = '';
-    return;
-  }
-
-  const { summary, total } = getProblemStats(problems);
-  const entries = Object.entries(summary).map(([difficulty, count]) => `${difficulty}: ${count}`).join(' · ');
-  problemStats.innerHTML = `<span>${problems.length} problems loaded</span><strong>• Total ${total} pts</strong>`;
-  problemBreakdown.innerHTML = `
-    <li><span>Easy</span><strong>${summary.Easy}</strong></li>
-    <li><span>Medium</span><strong>${summary.Medium}</strong></li>
-    <li><span>Hard</span><strong>${summary.Hard}</strong></li>
-    <li><span>Formats</span><strong>${entries}</strong></li>
-  `;
-}
-
-function addNotification(message) {
-  state.notifications.unshift({ text: message, id: Date.now() + Math.random() });
-  state.notifications = state.notifications.slice(0, 8);
-  renderNotifications();
-}
-
-function renderNotifications() {
-  notificationFeed.innerHTML = state.notifications
-    .map((note) => `<li>${note.text}</li>`)
+  if (!problemStats || !problemBreakdown) return;
+  const counts = state.problems.reduce((result, problem) => {
+    result[problem.difficulty] = (result[problem.difficulty] || 0) + 1;
+    return result;
+  }, {});
+  const totalPoints = state.problems.reduce((total, problem) => total + Number(problem.points || 0), 0);
+  problemStats.innerHTML = `<span>${state.problems.length} problems loaded</span><strong>• Total ${totalPoints} pts</strong>`;
+  problemBreakdown.innerHTML = ['Easy', 'Medium', 'Hard']
+    .map(difficulty => `<li><span>${difficulty}</span><strong>${counts[difficulty] || 0}</strong></li>`)
     .join('');
+  if (problemSidebar) {
+    problemSidebar.innerHTML = state.problems.map(problem =>
+      `<li><strong>${problem.id}:</strong> ${problem.title}<small>${problem.difficulty}</small></li>`
+    ).join('');
+  }
 }
 
-function loadUploadedProblems(file) {
-  if (!file) return;
-  const reader = new FileReader();
-  reader.onload = () => {
-    try {
-      const parsed = JSON.parse(reader.result);
-      const list = Array.isArray(parsed) ? parsed : parsed.problems || [];
-      if (list.length !== 10) {
-        alert('The uploaded file should contain 10 problems to match this arena format.');
-        return;
-      }
-      state.problems = list.map((problem) => ({
-        ...problem,
-        type: problem.type || 'code',
-        difficulty: problem.difficulty || 'Easy',
-        points: Number(problem.points || 100)
-      }));
-      renderProblemPreview();
-      addNotification('Problem set updated from uploaded JSON.');
-    } catch (error) {
-      alert('Invalid JSON file. Please upload a valid problems.json file.');
-    }
-  };
-  reader.readAsText(file);
-}
-
-function createRoom() {
-  const code = randomRoomCode();
-  state.room = { code, timerMinutes: Number(timerInput.value), started: false };
-  state.players = [];
-  state.currentPlayer = null;
-  state.notifications = [];
-  state.countdown = state.room.timerMinutes * 60;
-  state.gameStarted = false;
-  state.ended = false;
-  roomBadge.textContent = `Room: ${code}`;
-  roomBadge.classList.remove('hidden');
-  activeRoomCode.textContent = code;
-  roomInput.value = code;
-  joinLinkInput.value = getJoinLink(code);
-  lobbyInfo.innerHTML = `<span>${state.players.length}/30 players ready</span><span>Waiting for Master to start...</span>`;
-  playerList.innerHTML = '';
-  startGameButton.classList.remove('hidden');
-  document.getElementById('adminView').classList.remove('hidden');
-  document.getElementById('playerView').classList.add('hidden');
-  document.getElementById('gameView').classList.add('hidden');
-  winnerView.classList.add('hidden');
-  difficultyFilter.value = 'all';
-  state.roomHistory = [];
-  addNotification(`Room ${code} created. Share the join link separately.`);
-  persistRoomState();
-  window.history.replaceState({}, '', `${window.location.pathname}?room=${code}`);
-}
-
-function joinRoom() {
-  const roomCode = roomInput.value.trim().toUpperCase();
-  const storedRoom = loadRoomFromStorage(roomCode);
-  if (!storedRoom) {
-    alert('This room has not been created yet. Ask the master to create it first.');
+function renderProblemMap() {
+  if (!problemMap) return;
+  if (!state.room || !state.room.started) {
+    problemMap.innerHTML = '';
     return;
   }
-
-  state.room = { code: roomCode, timerMinutes: storedRoom.timerMinutes || 25, started: Boolean(storedRoom.started) };
-  state.players = storedRoom.players || [];
-  state.gameStarted = Boolean(storedRoom.started);
-  state.countdown = Number(storedRoom.countdown || (state.room.timerMinutes * 60));
-  state.notifications = storedRoom.notifications || [];
-  state.problems = Array.isArray(storedRoom.problems) && storedRoom.problems.length ? storedRoom.problems : structuredClone(defaultProblems);
-  state.ended = Boolean(storedRoom.ended);
-
-  const name = nameInput.value.trim();
-  const roll = rollInput.value.trim();
-
-  if (!name || !roll || !roomCode) {
-    alert('Please fill in roll number, name, and room code.');
-    return;
-  }
-
-  const alreadyIn = state.players.some((player) => player.roll === roll);
-  if (alreadyIn) {
-    state.currentPlayer = state.players.find((player) => player.roll === roll);
-  } else {
-    const newPlayer = {
-      id: Date.now(),
-      name,
-      roll,
-      score: 0,
-      solved: 0,
-      firstBloods: 0,
-      wrongAttempts: 0,
-      role: 'player',
-      solvedProblems: []
-    };
-    state.players.push(newPlayer);
-    state.currentPlayer = newPlayer;
-  }
-
-  persistRoomState();
-  renderLobby();
-  lobbyInfo.innerHTML = `<span>${state.players.length}/30 players joined</span><span>Waiting for Master to start...</span>`;
-  addNotification(`${name} joined room ${roomCode}.`);
-  persistRoomState();
-  window.history.replaceState({}, '', `${window.location.pathname}?room=${roomCode}`);
-
-  if (state.gameStarted) {
-    document.getElementById('playerView').classList.add('hidden');
-    document.getElementById('gameView').classList.remove('hidden');
-    renderBoard();
-    renderSidebar();
-    renderLeaderboard();
-    countdownTimer.textContent = formatTimer(state.countdown);
-  } else {
-    document.getElementById('playerView').classList.remove('hidden');
-    document.getElementById('gameView').classList.add('hidden');
-  }
-}
-
-window.addEventListener('storage', (event) => {
-  if (event.key !== 'codeArena.roomState' || !event.newValue) return;
-
-  try {
-    const roomState = JSON.parse(event.newValue);
-    if (!roomState || !state.room || roomState.code !== state.room.code) return;
-
-    state.players = roomState.players || [];
-    state.gameStarted = Boolean(roomState.started);
-    state.countdown = Number(roomState.countdown || (state.room.timerMinutes * 60));
-    state.notifications = roomState.notifications || [];
-    state.problems = Array.isArray(roomState.problems) && roomState.problems.length ? roomState.problems : structuredClone(defaultProblems);
-    state.ended = Boolean(roomState.ended);
-
-    if (state.gameStarted) {
-      document.getElementById('playerView').classList.add('hidden');
-      document.getElementById('gameView').classList.remove('hidden');
-      renderBoard();
-      renderSidebar();
-      renderLeaderboard();
-      countdownTimer.textContent = formatTimer(state.countdown);
-    } else {
-      document.getElementById('playerView').classList.remove('hidden');
-      document.getElementById('gameView').classList.add('hidden');
-      renderLobby();
-      lobbyInfo.innerHTML = `<span>${state.players.length}/30 players joined</span><span>Waiting for Master to start...</span>`;
-    }
-  } catch (error) {
-    // ignore invalid storage payloads
-  }
-});
-
-function renderLobby() {
-  const players = state.players;
-  playerList.innerHTML = players
-    .map((player, index) => `
-      <li>
-        <span>${index + 1}. ${player.name}</span>
-        <strong>${player.roll}</strong>
-      </li>
-    `)
-    .join('');
-}
-
-function startCountdown() {
-  if (!state.room || state.gameStarted) return;
-  state.gameStarted = true;
-  state.room.started = true;
-  document.getElementById('playerView').classList.add('hidden');
-  document.getElementById('gameView').classList.remove('hidden');
-  renderBoard();
-  renderSidebar();
-  renderLeaderboard();
-  countdownTimer.textContent = formatTimer(state.countdown);
-  persistRoomState();
-
-  let remaining = 5;
-  addNotification('Game starts in 5...');
-  persistRoomState();
-  const tick = setInterval(() => {
-    if (remaining <= 0) {
-      clearInterval(tick);
-      addNotification('The arena is live. Good luck!');
-      persistRoomState();
-      startTicking();
-      return;
-    }
-    if (remaining === 5) {
-      addNotification('5...');
-    } else if (remaining === 4) {
-      addNotification('4...');
-    } else if (remaining === 3) {
-      addNotification('3...');
-    } else if (remaining === 2) {
-      addNotification('2...');
-    } else if (remaining === 1) {
-      addNotification('1...');
-    }
-    remaining -= 1;
-    persistRoomState();
-  }, 1000);
-}
-
-function startTicking() {
-  clearInterval(state.timerInterval);
-  clearInterval(state.leaderboardInterval);
-
-  state.timerInterval = setInterval(() => {
-    if (state.ended) return;
-    state.countdown -= 1;
-    if (state.countdown <= 0) {
-      state.countdown = 0;
-      endGame();
-      return;
-    }
-    countdownTimer.textContent = formatTimer(state.countdown);
-    persistRoomState();
-  }, 1000);
-
-  state.leaderboardInterval = setInterval(() => {
-    if (!state.ended) {
-      renderLeaderboard();
-      persistRoomState();
-    }
-  }, 3000);
-}
-
-function renderBoard() {
-  const board = [];
-  for (let row = 0; row < BOARD_CONFIG.rows; row += 1) {
-    for (let col = 0; col < BOARD_CONFIG.cols; col += 1) {
-      board.push({ row, col, empty: true, problem: null });
-    }
-  }
-
-  const problems = state.problems;
-  problems.forEach((problem) => {
-    const location = BOARD_CONFIG.nodes[problem.id];
-    if (!location) return;
-    const flatIndex = location.y * BOARD_CONFIG.cols + location.x;
-    const node = board[flatIndex];
-    node.empty = false;
-    node.problem = problem;
-    node.solved = Boolean(state.currentPlayer && state.currentPlayer.solvedProblems.includes(problem.id));
-  });
-
-  problemMap.innerHTML = board.map(({ empty, problem, solved }) => {
-    if (empty) {
-      return '<div class="map-node empty"></div>';
-    }
-
-    const firstBlood = problem.firstBlood;
-    const solvedClass = solved ? 'solved' : '';
-    const firstBloodClass = firstBlood ? 'first-blood' : '';
-    const icon = problem.type === 'mcq' ? '🅰️' : problem.type === 'fill' ? '🔧' : '💻';
-    return `
-      <button class="map-node ${solvedClass} ${firstBloodClass}" data-problem-id="${problem.id}">
-        <span class="crown">${firstBlood ? '🏆' : ''}</span>
-        <span class="node-icon">${icon}</span>
-        <span class="node-label">${problem.id}</span>
-        <span class="node-points">${problem.points}</span>
-      </button>
-    `;
+  const html = state.room.problems.map(p => {
+    const submission = state.currentPlayer && state.currentPlayer.submissions && state.currentPlayer.submissions[p.id];
+    const status = submission ? (submission.correct ? 'correct' : 'wrong') : 'pending';
+    return `<button class="map-node ${status}" onclick="openProblemModal('${p.id}')">
+      <span class="node-label">${p.id}</span><span class="node-points">${submission ? status : `${p.points} pts`}</span>
+    </button>`;
   }).join('');
-
-  const nodes = problemMap.querySelectorAll('.map-node:not(.empty)');
-  nodes.forEach((node) => {
-    node.addEventListener('click', () => openProblem(node.dataset.problemId));
-  });
-}
-
-function renderSidebar() {
-  const filter = difficultyFilter.value;
-  const problems = state.problems.filter((problem) => filter === 'all' || problem.difficulty === filter);
-
-  problemSidebar.innerHTML = problems.map((problem) => {
-    const solved = state.currentPlayer && state.currentPlayer.solvedProblems.includes(problem.id);
-    const firstBlood = problem.firstBlood;
-    return `
-      <li data-problem-id="${problem.id}" class="${solved ? 'solved-problem' : ''}">
-        <div class="problem-title-row">
-          <strong>${problem.id} • ${problem.title}</strong>
-          <span class="problem-badge ${problem.difficulty.toLowerCase()}">${problem.difficulty}</span>
-        </div>
-        <div class="meta">
-          <span>${problem.type.toUpperCase()}</span>
-          <span>${problem.points} pts</span>
-        </div>
-        <div class="meta">
-          <span>${firstBlood ? '🏆 First blood' : 'Open challenge'}</span>
-          <span>${solved ? 'Solved' : 'Unsolved'}</span>
-        </div>
-      </li>
-    `;
-  }).join('');
-
-  problemSidebar.querySelectorAll('li').forEach((item) => {
-    item.addEventListener('click', () => openProblem(item.dataset.problemId));
-  });
+  problemMap.innerHTML = html;
 }
 
 function renderLeaderboard() {
-  const unsortedPlayers = [...state.players];
-  const leaderboard = unsortedPlayers.sort((a, b) => {
-    if (b.score !== a.score) return b.score - a.score;
-    if (a.wrongAttempts !== b.wrongAttempts) return a.wrongAttempts - b.wrongAttempts;
-    if (b.firstBloods !== a.firstBloods) return b.firstBloods - a.firstBloods;
-    return (a.solvedProblems || []).length - (b.solvedProblems || []).length;
-  });
-
-  leaderboardList.innerHTML = leaderboard.map((player, index) => `
-    <div class="leaderboard-item">
-      <span class="rank">${index + 1}</span>
-      <div class="player-meta">
-        <strong>${player.name}</strong>
-        <small>${player.solvedProblems.length}✓ • ${player.firstBloods} First Bloods</small>
-      </div>
-      <span class="score">${player.score}</span>
-    </div>
-  `).join('');
-}
-
-function openProblem(problemId) {
-  const problem = state.problems.find((item) => item.id === problemId);
-  if (!problem) return;
-  state.selectedProblem = problem;
-  const existing = state.currentPlayer?.solvedProblems.includes(problem.id);
-
-  problemModalContent.innerHTML = `
-    <div class="problem-modal-header">
-      <p class="eyebrow">${problem.difficulty} • ${problem.type.toUpperCase()}</p>
-      <h3>${problem.id} • ${problem.title}</h3>
-      <div class="problem-detail-grid">
-        <span>Points: ${problem.points}</span>
-        <span>Category: ${problem.tag}</span>
-        <span>${existing ? 'Solved by you' : 'Active challenge'}</span>
-      </div>
-    </div>
-    <div class="problem-statement">
-      ${problem.text}
-    </div>
-    ${renderProblemEditor(problem)}
-    <div class="modal-actions">
-      <button id="submitProblemButton" class="primary-btn">Submit</button>
-    </div>
-  `;
-
-  problemModal.classList.remove('hidden');
-
-  document.getElementById('submitProblemButton').addEventListener('click', () => submitProblem(problem));
-}
-
-function renderProblemEditor(problem) {
-  if (problem.type === 'mcq') {
-    return `
-      <div class="option-list">
-        ${problem.options.map((option) => `
-          <label class="option-row">
-            <input type="radio" name="mcqAnswer" value="${option}" />
-            <span>${option}</span>
-          </label>
-        `).join('')}
-      </div>
-    `;
-  }
-
-  return `
-    <textarea class="code-editor" id="codeInput" spellcheck="false">${problem.starterCode || ''}</textarea>
-  `;
-}
-
-function submitProblem(problem) {
-  if (!state.currentPlayer) {
+  if (!leaderboardList) return;
+  if (!state.room || !state.room.players) {
+    leaderboardList.innerHTML = '<p>Waiting for players...</p>';
     return;
   }
+  const sortedPlayers = [...state.room.players].sort((a, b) => b.score - a.score);
+  const html = sortedPlayers.map((p, idx) => 
+    `<tr>
+      <td>${idx + 1}</td>
+      <td>${p.name}</td>
+      <td>${p.roll}</td>
+      <td>${p.score} pts</td>
+      <td>${p.solvedProblems ? p.solvedProblems.length : 0}</td>
+      <td>${p.wrongAttempts || 0}</td>
+      <td>${p.firstBloods || 0}</td>
+    </tr>`
+  ).join('');
+  leaderboardList.innerHTML = `<table><thead><tr><th>#</th><th>Name</th><th>Roll</th><th>Score</th><th>Solved</th><th>Wrong</th><th>FB</th></tr></thead><tbody>${html}</tbody></table>`;
+}
 
-  const player = state.currentPlayer;
-  let isCorrect = false;
-  let answerValue = '';
+function renderPlayerList() {
+  if (!playerList) return;
+  if (!state.room || !state.room.players) {
+    playerList.innerHTML = '<p>Waiting for players...</p>';
+    return;
+  }
+  const count = state.room.players.length;
+  const html = state.room.players.map((p, idx) =>
+    `<li>${idx + 1}. ${p.name} <strong>${p.roll}</strong></li>`
+  ).join('');
+  playerList.innerHTML = `<p>${count}/30 players joined</p><ul>${html}</ul>`;
+}
 
-  if (problem.type === 'mcq') {
-    const checked = document.querySelector('input[name="mcqAnswer"]:checked');
-    answerValue = checked ? checked.value : '';
-    isCorrect = answerValue === problem.answer;
-  } else {
-    const codeInput = document.getElementById('codeInput');
-    answerValue = codeInput ? codeInput.value : '';
-    const normalized = answerValue.replace(/\s+/g, ' ').trim();
-    const target = String(problem.answerSnippet || '').replace(/\s+/g, ' ').trim();
-    isCorrect = normalized.includes(target) || normalized.includes(problem.answerSnippet || '') || normalized.toLowerCase().includes(problem.title.toLowerCase().split(' ')[0].toLowerCase());
+function renderNotifications() {
+  if (!notificationFeed) return;
+  if (!state.room || !state.room.notifications) {
+    notificationFeed.innerHTML = '<p>No notifications</p>';
+    return;
+  }
+  const html = state.room.notifications.map(n => `<div class="notification">${n}</div>`).join('');
+  notificationFeed.innerHTML = html;
+}
+
+function renderCountdown() {
+  if (!countdownTimer) return;
+  if (!state.room) {
+    countdownTimer.textContent = '00:00';
+    return;
+  }
+  const mins = Math.floor(state.room.countdown / 60);
+  const secs = state.room.countdown % 60;
+  countdownTimer.textContent = `${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
+}
+
+function updateTimerDisplay() {
+  if (timerValue) {
+    timerValue.textContent = `${timerInput.value} min`;
+  }
+}
+
+function renderViews() {
+  const hasRoom = state.room !== null;
+  const gameActive = hasRoom && state.room.started && !state.room.ended;
+  const isPlayer = state.currentPlayer !== null;
+  const roomCodeInUrl = new URLSearchParams(window.location.search).get('room');
+
+  // Initially, show admin view if no room created yet and no player joined
+  // Show admin if we're the master and room hasn't started game yet
+  // Show player view if we have a room and we're a player and game hasn't started
+  // Also show player view if we're on a room URL waiting to join
+  // Show game view only when game is active
+  // Show winner view when game has ended
+  
+  if (adminView) {
+    // Show admin when: no room yet and no room code in URL, OR (we're master and room hasn't started game)
+    const showAdmin = (!hasRoom && !roomCodeInUrl) || (state.isMaster && !state.room?.started);
+    adminView.classList.toggle('hidden', !showAdmin);
+  }
+  if (playerView) {
+    // Show player when: (we have room AND we're a player) OR (we're waiting to join with a room code in URL)
+    const showPlayer = ((hasRoom && isPlayer && !gameActive && !state.room.ended) || (roomCodeInUrl && !state.isMaster));
+    playerView.classList.toggle('hidden', !showPlayer);
+  }
+  if (gameView) {
+    gameView.classList.toggle('hidden', !gameActive);
+  }
+  if (winnerView) {
+    // Show winner when game has ended
+    const showWinner = (hasRoom && state.room.ended);
+    winnerView.classList.toggle('hidden', !showWinner);
   }
 
-  if (isCorrect) {
-    const alreadySolved = player.solvedProblems.includes(problem.id);
-    if (!alreadySolved) {
-      const firstBlood = !state.problems.find((p) => p.id === problem.id)?.firstBlood;
-      const basePoints = problem.points;
-      const solveScore = basePoints + (firstBlood ? 50 : 0) + (state.players.filter((entry) => entry.solvedProblems.includes(problem.id)).length > 0 ? 20 : 0);
-      player.score += solveScore;
-      player.solvedProblems.push(problem.id);
-      player.solved += 1;
-      problem.firstBlood = problem.firstBlood || firstBlood;
-      if (firstBlood) {
-        player.firstBloods += 1;
-        addNotification(`First blood on ${problem.id} awarded to ${player.name}!`);
-      } else {
-        addNotification(`${player.name} solved ${problem.id} for ${basePoints} points.`);
-      }
-      renderBoard();
-      renderSidebar();
-      renderLeaderboard();
-      problemModal.classList.add('hidden');
+  if (hasRoom && state.isMaster) {
+    if (roomBadge) {
+      roomBadge.textContent = `Room: ${state.room.code}`;
+      roomBadge.classList.remove('hidden');
     }
-  } else {
-    player.wrongAttempts += 1;
-    player.score = Math.max(0, player.score - 10);
-    addNotification(`${player.name} made a wrong attempt on ${problem.id}. -10 penalty.`);
+    if (startGameButton) {
+      startGameButton.classList.toggle('hidden', state.room.started);
+    }
+  } else if (roomBadge) {
+    roomBadge.classList.add('hidden');
+  }
+  if (activeRoomCode) {
+    activeRoomCode.textContent = hasRoom ? state.room.code : '--';
+  }
+  if (hasRoom && state.room.ended && winnerTitle && winnerRanking) {
+    const ranking = [...state.room.players].sort((a, b) => b.score - a.score);
+    winnerTitle.textContent = ranking.length ? `Winner: ${ranking[0].name}` : 'Final Results';
+    winnerRanking.innerHTML = ranking.map((player, index) =>
+      `<div>${index + 1}. ${player.name} <strong>${player.score} pts</strong></div>`
+    ).join('');
+  }
+
+  if (gameActive) {
+    renderProblemMap();
     renderLeaderboard();
   }
 }
 
-function endGame() {
-  if (state.ended) return;
-  state.ended = true;
-  clearInterval(state.timerInterval);
-  clearInterval(state.leaderboardInterval);
-
-  const ranking = [...state.players].sort((a, b) => {
-    if (b.score !== a.score) return b.score - a.score;
-    if (a.wrongAttempts !== b.wrongAttempts) return a.wrongAttempts - b.wrongAttempts;
-    if (b.firstBloods !== a.firstBloods) return b.firstBloods - a.firstBloods;
-    return (a.solvedProblems || []).length - (b.solvedProblems || []).length;
-  });
-
-  const champion = ranking[0] || { name: 'No champion' };
-  winnerTitle.textContent = `Winner: ${champion.name}`;
-  winnerRanking.innerHTML = ranking.map((player, index) => `
-    <div class="rank-row">
-      <span class="medal">${index === 0 ? '🥇' : index === 1 ? '🥈' : index === 2 ? '🥉' : '🏅'}</span>
-      <span>${player.name}</span>
-      <strong>${player.score} pts</strong>
-    </div>
-  `).join('');
-
-  winnerView.classList.remove('hidden');
-  document.getElementById('gameView').classList.add('hidden');
-  addNotification('Time is up! Final leaderboard locked.');
-}
-
-function resetGame() {
-  clearInterval(state.timerInterval);
-  clearInterval(state.leaderboardInterval);
-  state.room = null;
-  state.players = [];
-  state.currentPlayer = null;
-  state.problems = structuredClone(defaultProblems);
-  state.countdown = 25 * 60;
-  state.gameStarted = false;
-  state.ended = false;
-  state.notifications = [];
-  state.selectedProblem = null;
-  problemModal.classList.add('hidden');
-  winnerView.classList.add('hidden');
-  document.getElementById('adminView').classList.remove('hidden');
-  document.getElementById('playerView').classList.add('hidden');
-  document.getElementById('gameView').classList.add('hidden');
-  roomBadge.classList.add('hidden');
-  roomBadge.textContent = 'Room: --';
-  joinLinkInput.value = 'https://example.com/?room=ROOMCODE';
-  startGameButton.classList.add('hidden');
-  countdownTimer.textContent = '25:00';
-  timerInput.value = 25;
-  timerValue.textContent = '25 min';
-  window.history.replaceState({}, '', window.location.pathname);
+function renderAll() {
+  renderCountdown();
   renderProblemPreview();
+  renderPlayerList();
+  renderLeaderboard();
   renderNotifications();
-  renderLobby();
-  renderSidebar();
+  renderProblemMap();
+  renderViews();
 }
 
-function copyJoinLink() {
-  const link = joinLinkInput.value;
-  if (!link || link.includes('ROOMCODE')) {
-    return;
+// Problem modal
+function openProblemModal(problemId) {
+  const problem = state.room.problems.find(p => p.id === problemId);
+  if (!problem) return;
+  state.selectedProblem = problem;
+
+  if (problemTitle) problemTitle.textContent = `${problem.id}: ${problem.title} (${problem.points} pts)`;
+  if (problemText) problemText.textContent = problem.text;
+  const submission = state.currentPlayer && state.currentPlayer.submissions &&
+    state.currentPlayer.submissions[problem.id];
+
+  if (problemContent) {
+    if (problem.type === 'mcq') {
+      problemContent.innerHTML = problem.options.map(opt => 
+        `<label><input type="radio" name="mcqAnswer" value="${opt}"/> ${opt}</label>`
+      ).join('<br/>');
+    } else if (problem.type === 'code' || problem.type === 'fill') {
+      problemContent.innerHTML = 
+        `<label for="languageSelect">Language</label>
+         <select id="languageSelect">
+           <option value="javascript">JavaScript</option><option value="python">Python</option>
+           <option value="java">Java</option><option value="cpp">C++</option><option value="c">C</option>
+           <option value="csharp">C#</option><option value="go">Go</option><option value="rust">Rust</option>
+           <option value="kotlin">Kotlin</option><option value="php">PHP</option>
+         </select>
+         <pre>${problem.starterCode || ''}</pre>
+         <textarea class="code-editor" id="codeInput" spellcheck="false">${problem.starterCode || ''}</textarea>`;
+    } else {
+      problemContent.textContent = problem.answerSnippet || 'Answer: ...';
+    }
+    if (submission && problemContent) {
+      problemContent.insertAdjacentHTML('afterbegin',
+        `<div class="submission-result ${submission.correct ? 'correct' : 'wrong'}">
+          ${submission.correct ? 'Correct answer' : 'Wrong answer'} · ${submission.language}
+        </div>`);
+    }
+    if (submitBtn) {
+      submitBtn.disabled = Boolean(submission) || !state.currentPlayer;
+      submitBtn.textContent = submission ? 'Completed' : 'Submit';
+    }
   }
-  navigator.clipboard.writeText(link).then(() => {
-    addNotification('Join link copied to clipboard.');
-  }).catch(() => {
-    joinLinkInput.select();
-    document.execCommand('copy');
-    addNotification('Join link copied to clipboard.');
-  });
+
+  if (problemModal) problemModal.classList.remove('hidden');
 }
 
-timerInput.addEventListener('input', () => {
-  timerValue.textContent = `${timerInput.value} min`;
-});
+// Setup event listeners (called after DOM is ready)
+function setupEventListeners() {
+  if (closeModalButton) {
+    closeModalButton.addEventListener('click', () => {
+      if (problemModal) problemModal.classList.add('hidden');
+      state.selectedProblem = null;
+    });
+  }
 
-problemUpload.addEventListener('change', (event) => {
-  const [file] = event.target.files;
-  loadUploadedProblems(file);
-});
+  if (submitBtn) {
+    submitBtn.addEventListener('click', () => {
+      if (!state.selectedProblem || !state.currentPlayer || !state.room) return;
+      let answer = '';
+      let language = 'javascript';
+      if (state.selectedProblem.type === 'mcq') {
+        const selected = document.querySelector('input[name="mcqAnswer"]:checked');
+        answer = selected ? selected.value : '';
+      } else {
+        const input = document.getElementById('codeInput');
+        answer = input ? input.value : '';
+        const languageInput = document.getElementById('languageSelect');
+        language = languageInput ? languageInput.value : language;
+      }
+      socket.emit('problem:submit', {
+        roomCode: state.room.code,
+        problemId: state.selectedProblem.id,
+        answer,
+        language
+      });
+      if (problemModal) problemModal.classList.add('hidden');
+    });
+  }
 
-createRoomButton.addEventListener('click', createRoom);
-copyJoinLinkButton.addEventListener('click', copyJoinLink);
-joinRoomButton.addEventListener('click', joinRoom);
-startGameButton.addEventListener('click', startCountdown);
-resetButton.addEventListener('click', resetGame);
-closeModalButton.addEventListener('click', () => problemModal.classList.add('hidden'));
+  if (timerInput) {
+    timerInput.addEventListener('change', updateTimerDisplay);
+  }
 
-difficultyFilter.addEventListener('change', () => {
-  if (state.gameStarted) renderSidebar();
-});
+  if (uploadBtn) {
+    uploadBtn.addEventListener('click', () => {
+      const input = document.createElement('input');
+      input.type = 'file';
+      input.accept = '.json';
+      input.onchange = (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+        const reader = new FileReader();
+        reader.onload = (event) => {
+          try {
+            const data = JSON.parse(event.target.result);
+            state.problems = data;
+            renderAll();
+          } catch (err) {
+            alert('Invalid JSON file.');
+          }
+        };
+        reader.readAsText(file);
+      };
+      input.click();
+    });
+  }
 
-if (setupJoinViewFromUrl()) {
-  renderLobby();
-} else {
-  document.getElementById('adminView').classList.remove('hidden');
-  document.getElementById('playerView').classList.add('hidden');
+  if (copyBtn) {
+    copyBtn.addEventListener('click', () => {
+      joinLinkInput.select();
+      document.execCommand('copy');
+      const originalText = copyBtn.textContent;
+      copyBtn.textContent = 'Copied!';
+      setTimeout(() => { copyBtn.textContent = originalText; }, 2000);
+    });
+  }
+
+  if (createRoomButton) {
+    createRoomButton.addEventListener('click', () => {
+      const timerMinutes = Number(timerInput.value) || 25;
+      socket.emit('master:createRoom', { timerMinutes });
+    });
+  }
+
+  if (startGameButton) {
+    startGameButton.addEventListener('click', () => {
+      if (!state.room) return;
+      socket.emit('game:start', { roomCode: state.room.code });
+    });
+  }
+
+  if (joinLobbyButton) {
+    joinLobbyButton.addEventListener('click', () => {
+      const name = nameInput.value.trim();
+      const roll = rollInput.value.trim();
+      const roomCode = roomInput.value.trim();
+      if (!name || !roll || !roomCode) {
+        alert('Please fill all fields');
+        return;
+      }
+      socket.emit('player:joinRoom', { name, roll, roomCode });
+    });
+  }
+
+  if (resetButton) {
+    resetButton.addEventListener('click', () => {
+      state.room = null;
+      state.currentPlayer = null;
+      state.isMaster = false;
+      socket.disconnect();
+      socket.connect();
+      renderAll();
+    });
+  }
 }
 
-renderProblemPreview();
-renderNotifications();
-renderLobby();
-renderSidebar();
+// Setup URL-based room detection
+function setupJoinFromUrl() {
+  const params = new URLSearchParams(window.location.search);
+  const roomCode = params.get('room');
+  if (roomCode) {
+    if (roomInput) roomInput.value = roomCode;
+    if (playerView) playerView.classList.remove('hidden');
+    if (adminView) adminView.classList.add('hidden');
+  } else {
+    if (adminView) adminView.classList.remove('hidden');
+    if (playerView) playerView.classList.add('hidden');
+  }
+}
+
+// Socket.IO event handlers
+socket.on('room:created', (data) => {
+  state.room = data.room;
+  state.isMaster = true;
+  if (joinLinkInput) {
+    joinLinkInput.value = data.joinLink;
+  }
+  renderAll();
+});
+
+socket.on('room:state', (data) => {
+  state.room = data;
+  if (!state.isMaster && !state.currentPlayer && rollInput && data.players) {
+    state.currentPlayer = data.players.find(
+      player => player.roll.toLowerCase() === rollInput.value.trim().toLowerCase()
+    ) || null;
+  }
+  if (state.currentPlayer && data.players) {
+    const updated = data.players.find(p => p.id === state.currentPlayer.id);
+    if (updated) {
+      state.currentPlayer = updated;
+    }
+  }
+  renderAll();
+});
+
+socket.on('game:started', (data) => {
+  state.room = data;
+  state.gameStarted = true;
+  renderAll();
+});
+
+socket.on('error', (msg) => {
+  alert(`Error: ${msg}`);
+});
+
+socket.on('room:error', ({ message }) => {
+  alert(message);
+});
+
+// Main initialization
+document.addEventListener('DOMContentLoaded', async () => {
+  initializeUI();
+  await loadDefaultProblems();
+  setupJoinFromUrl();
+  setupEventListeners();
+  renderAll();
+});

@@ -188,7 +188,7 @@ input[type="range"] {
   accent-color: var(--primary);
 }
 
-#createRoomButton, #joinRoomButton, #startGameButton {
+#createRoomButton, #joinLobbyButton, #startGameButton {
   width: 100%;
   margin-top: 22px;
 }
@@ -396,6 +396,33 @@ input[type="range"] {
 .map-node.solved {
   border-color: rgba(61, 217, 160, 0.6);
   background: rgba(61, 217, 160, 0.08);
+}
+
+.map-node.correct {
+  border-color: rgba(61, 217, 160, 0.75);
+  background: rgba(61, 217, 160, 0.12);
+}
+
+.map-node.wrong {
+  border-color: rgba(255, 107, 107, 0.75);
+  background: rgba(255, 107, 107, 0.12);
+}
+
+.submission-result {
+  border-radius: 8px;
+  padding: 9px 12px;
+  margin-bottom: 12px;
+  font-weight: 700;
+}
+
+.submission-result.correct {
+  color: var(--easy);
+  background: rgba(61, 217, 160, 0.12);
+}
+
+.submission-result.wrong {
+  color: var(--hard);
+  background: rgba(255, 107, 107, 0.12);
 }
 
 .map-node.first-blood {

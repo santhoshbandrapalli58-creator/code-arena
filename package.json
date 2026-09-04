@@ -2,7 +2,12 @@
   "name": "code-arena",
   "private": true,
   "scripts": {
-    "dev": "python -m http.server 8000",
-    "start": "python -m http.server 8000"
+    "dev": "node server.js",
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "express": "^5.2.1",
+    "socket.io": "^4.8.3",
+    "vercel": "^59.11.2"
   }
 }
