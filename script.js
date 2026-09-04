@@ -14,10 +14,29 @@ const database = firebase.database();
 const clientId = localStorage.getItem('codeArenaClientId') ||
   `client-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
 localStorage.setItem('codeArenaClientId', clientId);
+const playerSessionKey = 'codeArenaPlayerSession';
+const compilerVersions = {
+  javascript: ['javascript', '18.15.0'],
+  python: ['python', '3.10.0'],
+  java: ['java', '15.0.2'],
+  cpp: ['c++', '10.2.0'],
+  c: ['c', '10.2.0'],
+  csharp: ['csharp', '6.12.0'],
+  go: ['go', '1.16.2'],
+  rust: ['rust', '1.68.2'],
+  kotlin: ['kotlin', '1.6.10'],
+  php: ['php', '8.2.3']
+};
 let activeRoomRef = null;
 let roomListener = null;
 let timerTicker = null;
 const socketHandlers = {};
+let firebaseSession = null;
+try {
+  firebaseSession = JSON.parse(localStorage.getItem(playerSessionKey) || 'null');
+} catch {
+  localStorage.removeItem(playerSessionKey);
+}
 
 function emitLocal(event, payload) {
   (socketHandlers[event] || []).forEach(handler => handler(payload));
@@ -48,6 +67,18 @@ function listenToRoom(roomCode) {
         }, 1000);
       }
     }
+    let session = null;
+    try {
+      session = JSON.parse(localStorage.getItem(playerSessionKey) || 'null');
+    } catch {
+      localStorage.removeItem(playerSessionKey);
+    }
+    if (!state.isMaster && !state.currentPlayer && session && session.roomCode === roomCode) {
+      const players = Array.isArray(room.players) ? room.players : Object.values(room.players || {});
+      state.currentPlayer = players.find(player =>
+        player.id === clientId || String(player.roll).toLowerCase() === String(session.roll).toLowerCase()
+      ) || null;
+    }
     emitLocal('room:state', room);
   };
   activeRoomRef.on('value', roomListener);
@@ -55,7 +86,52 @@ function listenToRoom(roomCode) {
 
 function evaluateClientSubmission(problem, answer) {
   if (problem.type === 'mcq') {
-    return String(answer).trim() === String(problem.answer).trim();
+    return String(answer).trim().toLowerCase() === String(problem.answer).trim().toLowerCase();
+  }
+
+  async function runCodeAgainstTests(problem, code, language) {
+    const testCases = Array.isArray(problem.testCases) ? problem.testCases : [];
+    if (!testCases.length) {
+      return {
+        correct: evaluateClientSubmission(problem, code),
+        message: 'No test cases were supplied; answer pattern validation was used.',
+        passed: 0,
+        total: 0
+      };
+    }
+    const compiler = compilerVersions[language] || compilerVersions.javascript;
+    const results = [];
+    for (const testCase of testCases) {
+      const response = await fetch('https://emkc.org/api/v2/piston/execute', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          language: compiler[0],
+          version: compiler[1],
+          files: [{ content: code }],
+          stdin: String(testCase.input || '')
+        })
+      });
+      if (!response.ok) {
+        throw new Error(`Compiler service returned HTTP ${response.status}.`);
+      }
+      const result = await response.json();
+      const output = String(result.run && result.run.stdout || '').trim();
+      const expected = String(testCase.output ?? testCase.expectedOutput ?? '').trim();
+      results.push({
+        passed: output === expected,
+        expected,
+        actual: output,
+        stderr: String(result.run && result.run.stderr || '').trim()
+      });
+    }
+    return {
+      correct: results.every(result => result.passed),
+      message: `${results.filter(result => result.passed).length}/${results.length} test cases passed.`,
+      passed: results.filter(result => result.passed).length,
+      total: results.length,
+      results
+    };
   }
   const normalizedAnswer = String(answer || '').replace(/\s+/g, ' ').trim().toLowerCase();
   const target = String(problem.answerSnippet || '').replace(/\s+/g, ' ').trim().toLowerCase();
@@ -84,6 +160,9 @@ const socket = {
         problems: Array.isArray(payload.problems) ? payload.problems : []
       };
       database.ref(`rooms/${roomCode}`).set(room).then(() => {
+        localStorage.setItem(playerSessionKey, JSON.stringify({
+          roomCode, role: 'master', name: '', roll: ''
+        }));
         emitLocal('room:created', {
           roomCode,
           joinLink: `${window.location.origin}/?room=${roomCode}`,
@@ -123,6 +202,9 @@ const socket = {
           notifications: [...(room.notifications || []), `${payload.name} joined room ${roomCode}.`]
         }).then(() => {
           state.currentPlayer = player;
+          localStorage.setItem(playerSessionKey, JSON.stringify({
+            roomCode, role: 'player', name: payload.name, roll: payload.roll
+          }));
           listenToRoom(roomCode);
         });
       }).catch(error => emitLocal('room:error', { message: error.message }));
@@ -140,10 +222,13 @@ const socket = {
         if (!player || !problem) return room;
         player.submissions = player.submissions || {};
         if (player.submissions[payload.problemId]) return room;
-        const correct = evaluateClientSubmission(problem, payload.answer);
+        const correct = problem.type === 'mcq'
+          ? evaluateClientSubmission(problem, payload.answer)
+          : Boolean(payload.correct);
         player.submissions[payload.problemId] = {
           correct, status: correct ? 'correct' : 'wrong',
-          language: payload.language || 'javascript'
+          language: payload.language || 'javascript',
+          message: payload.message || (correct ? 'All test cases passed.' : 'Some test cases failed.')
         };
         if (correct) {
           player.score += Number(problem.points || 100);
@@ -180,6 +265,7 @@ let rollInput, nameInput, roomInput, joinLobbyButton;
 let playerList, problemSidebar, problemMap, leaderboardList, notificationFeed, countdownTimer;
 let problemModal, problemTitle, problemText, problemContent, closeModalButton, submitBtn, resetButton;
 let problemStats, problemBreakdown, activeRoomCode, winnerTitle, winnerRanking;
+let joinCard;
 
 function initializeUI() {
   adminView = document.getElementById('adminView');
@@ -200,6 +286,7 @@ function initializeUI() {
   nameInput = document.getElementById('nameInput');
   roomInput = document.getElementById('roomInput');
   joinLobbyButton = document.getElementById('joinLobbyButton');
+  joinCard = document.querySelector('.join-card');
 
   playerList = document.getElementById('playerList');
   problemSidebar = document.getElementById('problemSidebar');
@@ -354,6 +441,9 @@ function renderViews() {
       (roomCodeInUrl && !hasRoom && !state.isMaster));
     playerView.classList.toggle('hidden', !showPlayer);
   }
+  if (joinCard) {
+    joinCard.classList.toggle('hidden', Boolean(state.currentPlayer));
+  }
   if (gameView) {
     gameView.classList.toggle('hidden', !gameActive);
   }
@@ -437,7 +527,7 @@ function renderSubmissionResult(submission) {
   if (submission) {
     problemContent.insertAdjacentHTML('afterbegin',
       `<div class="submission-result ${submission.correct ? 'correct' : 'wrong'}">
-        ${submission.correct ? 'Correct answer' : 'Wrong answer'} · ${languageNames[submission.language] || submission.language}
+        ${submission.correct ? 'Correct answer' : 'Wrong answer'} · ${submission.message || languageNames[submission.language] || submission.language}
       </div>`);
   }
   submitBtn.disabled = Boolean(submission) || !state.currentPlayer;
@@ -503,7 +593,7 @@ function setupEventListeners() {
   }
 
   if (submitBtn) {
-    submitBtn.addEventListener('click', () => {
+    submitBtn.addEventListener('click', async () => {
       if (!state.selectedProblem || !state.currentPlayer || !state.room) return;
       let answer = '';
       let language = 'javascript';
@@ -516,14 +606,31 @@ function setupEventListeners() {
         const languageInput = document.getElementById('languageSelect');
         language = languageInput ? languageInput.value : language;
       }
+      submitBtn.disabled = true;
+      submitBtn.textContent = 'Checking...';
+      let validation = {
+        correct: evaluateClientSubmission(state.selectedProblem, answer),
+        message: 'Answer checked.'
+      };
+      if (state.selectedProblem.type === 'code' || state.selectedProblem.type === 'fill') {
+        try {
+          validation = await runCodeAgainstTests(state.selectedProblem, answer, language);
+        } catch (error) {
+          submitBtn.disabled = false;
+          submitBtn.textContent = 'Submit';
+          problemContent.insertAdjacentHTML('afterbegin',
+            `<div class="submission-result wrong">Compilation error · ${error.message}</div>`);
+          return;
+        }
+      }
       socket.emit('problem:submit', {
         roomCode: state.room.code,
         problemId: state.selectedProblem.id,
         answer,
-        language
+        language,
+        correct: validation.correct,
+        message: validation.message
       });
-      submitBtn.disabled = true;
-      submitBtn.textContent = 'Checking...';
     });
   }
 
@@ -686,5 +793,13 @@ document.addEventListener('DOMContentLoaded', async () => {
   await loadDefaultProblems();
   setupJoinFromUrl();
   setupEventListeners();
+  if (firebaseSession && firebaseSession.roomCode) {
+    if (firebaseSession.role === 'master') state.isMaster = true;
+    if (firebaseSession.role === 'player') {
+      rollInput.value = firebaseSession.roll || '';
+      nameInput.value = firebaseSession.name || '';
+    }
+    listenToRoom(firebaseSession.roomCode);
+  }
   renderAll();
 });
