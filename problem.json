@@ -1,0 +1,112 @@
+[
+  {
+    "id": "E1",
+    "title": "Array Index",
+    "difficulty": "Easy",
+    "type": "mcq",
+    "points": 100,
+    "text": "What is the index of the first item in a zero-based array?",
+    "options": ["0", "1", "-1", "It depends"],
+    "answer": "0",
+    "tag": "Arrays"
+  },
+  {
+    "id": "E2",
+    "title": "Even Number",
+    "difficulty": "Easy",
+    "type": "mcq",
+    "points": 100,
+    "text": "Which operator checks the remainder after division?",
+    "options": ["+", "%", "/", "**"],
+    "answer": "%",
+    "tag": "Math"
+  },
+  {
+    "id": "E3",
+    "title": "Find Maximum",
+    "difficulty": "Easy",
+    "type": "code",
+    "points": 100,
+    "text": "Write a function that returns the largest number in an array.",
+    "starterCode": "function findMaximum(numbers) {\n  // Write your solution here\n}",
+    "answerSnippet": "Math.max",
+    "tag": "Arrays"
+  },
+  {
+    "id": "E4",
+    "title": "Reverse Text",
+    "difficulty": "Easy",
+    "type": "fill",
+    "points": 100,
+    "text": "Write code that reverses a string.",
+    "starterCode": "function reverseText(text) {\n  // Write your solution here\n}",
+    "answerSnippet": "reverse",
+    "tag": "Strings"
+  },
+  {
+    "id": "M1",
+    "title": "Stack Matching",
+    "difficulty": "Medium",
+    "type": "mcq",
+    "points": 250,
+    "text": "Which data structure is commonly used to check matching parentheses?",
+    "options": ["Queue", "Stack", "Graph", "Heap"],
+    "answer": "Stack",
+    "tag": "Stacks"
+  },
+  {
+    "id": "M2",
+    "title": "Binary Search",
+    "difficulty": "Medium",
+    "type": "mcq",
+    "points": 250,
+    "text": "What is the time complexity of binary search on a sorted array?",
+    "options": ["O(1)", "O(log n)", "O(n)", "O(n log n)"],
+    "answer": "O(log n)",
+    "tag": "Searching"
+  },
+  {
+    "id": "M3",
+    "title": "Count Vowels",
+    "difficulty": "Medium",
+    "type": "code",
+    "points": 250,
+    "text": "Write a function that counts vowels in a string.",
+    "starterCode": "function countVowels(text) {\n  // Write your solution here\n}",
+    "answerSnippet": "vowels",
+    "tag": "Strings"
+  },
+  {
+    "id": "H1",
+    "title": "Merge Sorted Arrays",
+    "difficulty": "Hard",
+    "type": "code",
+    "points": 500,
+    "text": "Write a function that merges two sorted arrays into one sorted array.",
+    "starterCode": "function mergeSortedArrays(first, second) {\n  // Write your solution here\n}",
+    "answerSnippet": "merge",
+    "tag": "Sorting"
+  },
+  {
+    "id": "H2",
+    "title": "Longest Substring",
+    "difficulty": "Hard",
+    "type": "code",
+    "points": 500,
+    "text": "Find the length of the longest substring without repeated characters.",
+    "starterCode": "function longestUniqueSubstring(text) {\n  // Write your solution here\n}",
+    "answerSnippet": "substring",
+    "tag": "Sliding Window"
+  },
+  {
+    "id": "H3",
+    "title": "Tree Traversal",
+    "difficulty": "Hard",
+    "type": "mcq",
+    "points": 500,
+    "text": "Which traversal visits a binary search tree in sorted order?",
+    "options": ["Preorder", "Postorder", "Inorder", "Level order"],
+    "answer": "Inorder",
+    "tag": "Trees"
+  }
+]
