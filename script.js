@@ -1,9 +1,165 @@
-// Socket.IO client for Code Arena multiplayer game
-const socket = (() => {
-  const s = io();
-  window.socket = s;  // Make globally accessible for debugging
-  return s;
-})();
+// Firebase Realtime Database transport for Code Arena multiplayer game.
+const firebaseConfig = {
+  apiKey: 'AIzaSyCCHTslXIudtdD9lOsXAHK8y6F2GgUDIkY',
+  authDomain: 'code-arena-215a3.firebaseapp.com',
+  databaseURL: 'https://code-arena-215a3-default-rtdb.firebaseio.com',
+  projectId: 'code-arena-215a3',
+  storageBucket: 'code-arena-215a3.firebasestorage.app',
+  messagingSenderId: '926304068319',
+  appId: '1:926304068319:web:d6eea88b87ffda75f33f6a'
+};
+
+firebase.initializeApp(firebaseConfig);
+const database = firebase.database();
+const clientId = localStorage.getItem('codeArenaClientId') ||
+  `client-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+localStorage.setItem('codeArenaClientId', clientId);
+let activeRoomRef = null;
+let roomListener = null;
+let timerTicker = null;
+const socketHandlers = {};
+
+function emitLocal(event, payload) {
+  (socketHandlers[event] || []).forEach(handler => handler(payload));
+}
+
+function listenToRoom(roomCode) {
+  if (activeRoomRef && roomListener) {
+    activeRoomRef.off('value', roomListener);
+  }
+  activeRoomRef = database.ref(`rooms/${roomCode}`);
+  roomListener = snapshot => {
+    const room = snapshot.val();
+    if (!room) {
+      emitLocal('room:error', { message: 'This room no longer exists.' });
+      return;
+    }
+    if (room.started && !room.ended) {
+      room.countdown = Math.max(0, Number(room.timerMinutes) * 60 -
+        Math.floor((Date.now() - Number(room.startedAt || Date.now())) / 1000));
+      if (!timerTicker) {
+        timerTicker = setInterval(() => {
+          if (state.room && state.room.started && !state.room.ended) {
+            state.room.countdown = Math.max(0, Number(state.room.timerMinutes) * 60 -
+              Math.floor((Date.now() - Number(state.room.startedAt)) / 1000));
+            if (state.room.countdown === 0) state.room.ended = true;
+            renderAll();
+          }
+        }, 1000);
+      }
+    }
+    emitLocal('room:state', room);
+  };
+  activeRoomRef.on('value', roomListener);
+}
+
+function evaluateClientSubmission(problem, answer) {
+  if (problem.type === 'mcq') {
+    return String(answer).trim() === String(problem.answer).trim();
+  }
+  const normalizedAnswer = String(answer || '').replace(/\s+/g, ' ').trim().toLowerCase();
+  const target = String(problem.answerSnippet || '').replace(/\s+/g, ' ').trim().toLowerCase();
+  return Boolean(target && normalizedAnswer.includes(target)) ||
+    normalizedAnswer.includes(String(problem.title || '').split(' ')[0].toLowerCase());
+}
+
+const socket = {
+  on(event, handler) {
+    socketHandlers[event] = socketHandlers[event] || [];
+    socketHandlers[event].push(handler);
+  },
+  emit(event, payload) {
+    if (event === 'master:createRoom') {
+      const roomCode = Math.random().toString(36).slice(2, 8).toUpperCase();
+      const room = {
+        code: roomCode,
+        timerMinutes: Number(payload.timerMinutes) || 25,
+        started: false,
+        ended: false,
+        countdown: (Number(payload.timerMinutes) || 25) * 60,
+        startedAt: null,
+        masterClientId: clientId,
+        players: [],
+        notifications: [`Room ${roomCode} created. Share the join link separately.`],
+        problems: Array.isArray(payload.problems) ? payload.problems : []
+      };
+      database.ref(`rooms/${roomCode}`).set(room).then(() => {
+        emitLocal('room:created', {
+          roomCode,
+          joinLink: `${window.location.origin}/?room=${roomCode}`,
+          room
+        });
+        listenToRoom(roomCode);
+      }).catch(error => emitLocal('room:error', { message: error.message }));
+    } else if (event === 'master:setProblems') {
+      const roomRef = database.ref(`rooms/${payload.roomCode}`);
+      roomRef.transaction(room => {
+        if (!room || room.masterClientId !== clientId || room.started) return room;
+        room.problems = payload.problems;
+        room.notifications = [...(room.notifications || []),
+          `Master uploaded ${payload.problems.length} problems.`];
+        return room;
+      })
+        .catch(error => emitLocal('room:error', { message: error.message }));
+    } else if (event === 'player:joinRoom') {
+      const roomCode = String(payload.roomCode || '').trim().toUpperCase();
+      const roomRef = database.ref(`rooms/${roomCode}`);
+      roomRef.once('value').then(snapshot => {
+        const room = snapshot.val();
+        if (!room) throw new Error('Room not found. Please check the code.');
+        const players = Array.isArray(room.players) ? room.players : [];
+        const existing = players.find(player =>
+          String(player.roll).toLowerCase() === String(payload.roll).toLowerCase());
+        const player = existing || {
+          id: clientId, name: payload.name, roll: payload.roll, score: 0,
+          firstBloods: 0, wrongAttempts: 0, solvedProblems: [], submissions: {}, role: 'player'
+        };
+        player.id = clientId;
+        player.name = payload.name;
+        player.roll = payload.roll;
+        if (!existing) players.push(player);
+        return roomRef.update({
+          players,
+          notifications: [...(room.notifications || []), `${payload.name} joined room ${roomCode}.`]
+        }).then(() => {
+          state.currentPlayer = player;
+          listenToRoom(roomCode);
+        });
+      }).catch(error => emitLocal('room:error', { message: error.message }));
+    } else if (event === 'game:start') {
+      database.ref(`rooms/${payload.roomCode}`).update({
+        started: true, ended: false, startedAt: Date.now()
+      }).catch(error => emitLocal('room:error', { message: error.message }));
+    } else if (event === 'problem:submit') {
+      const roomRef = database.ref(`rooms/${payload.roomCode}`);
+      roomRef.transaction(room => {
+        if (!room || !room.started) return room;
+        const players = Array.isArray(room.players) ? room.players : [];
+        const player = players.find(entry => entry.id === clientId);
+        const problem = (room.problems || []).find(entry => entry.id === payload.problemId);
+        if (!player || !problem) return room;
+        player.submissions = player.submissions || {};
+        if (player.submissions[payload.problemId]) return room;
+        const correct = evaluateClientSubmission(problem, payload.answer);
+        player.submissions[payload.problemId] = {
+          correct, status: correct ? 'correct' : 'wrong',
+          language: payload.language || 'javascript'
+        };
+        if (correct) {
+          player.score += Number(problem.points || 100);
+          player.solvedProblems = player.solvedProblems || [];
+          player.solvedProblems.push(payload.problemId);
+        } else {
+          player.wrongAttempts = Number(player.wrongAttempts || 0) + 1;
+          player.score = Math.max(0, Number(player.score || 0) - 10);
+        }
+        room.players = players;
+        return room;
+      }).catch(error => emitLocal('room:error', { message: error.message }));
+    }
+  }
+};
+window.socket = socket;
 
 // Local state
 const state = {
