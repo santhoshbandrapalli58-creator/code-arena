@@ -182,7 +182,29 @@ function sortPlayers(players) {
   });
 }
 
-function createRoom(code, timerMinutes) {
+function normalizeProblems(problems) {
+  if (!Array.isArray(problems) || problems.length === 0) {
+    return null;
+  }
+
+  const normalized = problems.map((problem, index) => ({
+    ...problem,
+    id: String(problem.id || `P${index + 1}`),
+    title: String(problem.title || `Problem ${index + 1}`),
+    difficulty: ['Easy', 'Medium', 'Hard'].includes(problem.difficulty) ? problem.difficulty : 'Easy',
+    type: ['mcq', 'fill', 'code'].includes(problem.type) ? problem.type : 'code',
+    points: Number(problem.points) > 0 ? Number(problem.points) : 100,
+    options: Array.isArray(problem.options) ? problem.options.map(String) : [],
+    firstBlood: false
+  }));
+
+  const hasAnswers = normalized.every((problem) =>
+    problem.type === 'mcq' ? problem.answer : problem.answerSnippet
+  );
+  return hasAnswers ? normalized : null;
+}
+
+function createRoom(code, timerMinutes, problems) {
   const room = {
     code,
     timerMinutes,
@@ -191,7 +213,7 @@ function createRoom(code, timerMinutes) {
     countdown: timerMinutes * 60,
     players: [],
     notifications: [`Room ${code} created. Share the join link separately.`],
-    problems: defaultProblems.map((problem) => ({ ...problem, firstBlood: false })),
+    problems: normalizeProblems(problems) || defaultProblems.map((problem) => ({ ...problem, firstBlood: false })),
     masterSocketId: null,
     timerInterval: null
   };
@@ -270,9 +292,9 @@ function evaluateSubmission(problem, answer) {
 }
 
 io.on('connection', (socket) => {
-  socket.on('master:createRoom', ({ timerMinutes = 25 }) => {
+  socket.on('master:createRoom', ({ timerMinutes = 25, problems }) => {
     const roomCode = randomRoomCode();
-    const room = createRoom(roomCode, Number(timerMinutes));
+    const room = createRoom(roomCode, Number(timerMinutes), problems);
     room.masterSocketId = socket.id;
     socket.data.roomCode = roomCode;
     socket.data.role = 'master';
@@ -284,6 +306,21 @@ io.on('connection', (socket) => {
       room: serializeRoom(room)
     });
     socket.emit('room:state', serializeRoom(room));
+  });
+
+  socket.on('master:setProblems', ({ roomCode, problems }) => {
+    const room = rooms.get(String(roomCode || '').trim().toUpperCase());
+    if (!room || room.masterSocketId !== socket.id || room.started) return;
+    const normalizedProblems = normalizeProblems(problems);
+    if (!normalizedProblems) {
+      socket.emit('room:error', {
+        message: 'Invalid problem file. Use a non-empty array with answers for every problem.'
+      });
+      return;
+    }
+    room.problems = normalizedProblems;
+    addNotification(room, `Master uploaded ${normalizedProblems.length} problems.`);
+    broadcastRoomState(room);
   });
 
   socket.on('player:joinRoom', ({ name, roll, roomCode }) => {

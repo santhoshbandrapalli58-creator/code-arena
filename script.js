@@ -194,7 +194,8 @@ function renderViews() {
   }
   if (playerView) {
     // Show player when: (we have room AND we're a player) OR (we're waiting to join with a room code in URL)
-    const showPlayer = ((hasRoom && isPlayer && !gameActive && !state.room.ended) || (roomCodeInUrl && !state.isMaster));
+    const showPlayer = ((hasRoom && isPlayer && !gameActive && !state.room.ended) ||
+      (roomCodeInUrl && !hasRoom && !state.isMaster));
     playerView.classList.toggle('hidden', !showPlayer);
   }
   if (gameView) {
@@ -244,6 +245,49 @@ function renderAll() {
   renderViews();
 }
 
+const languageNames = {
+  javascript: 'JavaScript',
+  python: 'Python',
+  java: 'Java',
+  cpp: 'C++',
+  c: 'C',
+  csharp: 'C#',
+  go: 'Go',
+  rust: 'Rust',
+  kotlin: 'Kotlin',
+  php: 'PHP'
+};
+
+function starterCodeForLanguage(problem, language) {
+  const templates = {
+    javascript: problem.starterCode || '',
+    python: `# ${problem.title}\n# Write your solution here\n`,
+    java: `// ${problem.title}\nclass Solution {\n    // Write your solution here\n}\n`,
+    cpp: `// ${problem.title}\n#include <bits/stdc++.h>\nusing namespace std;\n\n// Write your solution here\n`,
+    c: `/* ${problem.title} */\n#include <stdio.h>\n\n/* Write your solution here */\n`,
+    csharp: `// ${problem.title}\nusing System;\n\npublic class Solution\n{\n    // Write your solution here\n}\n`,
+    go: `// ${problem.title}\npackage main\n\n// Write your solution here\n`,
+    rust: `// ${problem.title}\nfn main() {\n    // Write your solution here\n}\n`,
+    kotlin: `// ${problem.title}\nfun main() {\n    // Write your solution here\n}\n`,
+    php: `<?php\n// ${problem.title}\n// Write your solution here\n`
+  };
+  return templates[language] || templates.javascript;
+}
+
+function renderSubmissionResult(submission) {
+  if (!problemContent || !submitBtn) return;
+  const existing = problemContent.querySelector('.submission-result');
+  if (existing) existing.remove();
+  if (submission) {
+    problemContent.insertAdjacentHTML('afterbegin',
+      `<div class="submission-result ${submission.correct ? 'correct' : 'wrong'}">
+        ${submission.correct ? 'Correct answer' : 'Wrong answer'} · ${languageNames[submission.language] || submission.language}
+      </div>`);
+  }
+  submitBtn.disabled = Boolean(submission) || !state.currentPlayer;
+  submitBtn.textContent = submission ? 'Completed' : 'Submit';
+}
+
 // Problem modal
 function openProblemModal(problemId) {
   const problem = state.room.problems.find(p => p.id === problemId);
@@ -269,21 +313,25 @@ function openProblemModal(problemId) {
            <option value="csharp">C#</option><option value="go">Go</option><option value="rust">Rust</option>
            <option value="kotlin">Kotlin</option><option value="php">PHP</option>
          </select>
-         <pre>${problem.starterCode || ''}</pre>
+         <pre id="starterCodePreview">${problem.starterCode || ''}</pre>
          <textarea class="code-editor" id="codeInput" spellcheck="false">${problem.starterCode || ''}</textarea>`;
     } else {
       problemContent.textContent = problem.answerSnippet || 'Answer: ...';
     }
-    if (submission && problemContent) {
-      problemContent.insertAdjacentHTML('afterbegin',
-        `<div class="submission-result ${submission.correct ? 'correct' : 'wrong'}">
-          ${submission.correct ? 'Correct answer' : 'Wrong answer'} · ${submission.language}
-        </div>`);
+  }
+  renderSubmissionResult(submission);
+  const languageSelect = document.getElementById('languageSelect');
+  if (languageSelect) {
+    if (submission && languageNames[submission.language]) {
+      languageSelect.value = submission.language;
     }
-    if (submitBtn) {
-      submitBtn.disabled = Boolean(submission) || !state.currentPlayer;
-      submitBtn.textContent = submission ? 'Completed' : 'Submit';
-    }
+    languageSelect.addEventListener('change', () => {
+      const code = starterCodeForLanguage(problem, languageSelect.value);
+      const preview = document.getElementById('starterCodePreview');
+      const editor = document.getElementById('codeInput');
+      if (preview) preview.textContent = code;
+      if (editor && !submission) editor.value = code;
+    });
   }
 
   if (problemModal) problemModal.classList.remove('hidden');
@@ -318,7 +366,8 @@ function setupEventListeners() {
         answer,
         language
       });
-      if (problemModal) problemModal.classList.add('hidden');
+      submitBtn.disabled = true;
+      submitBtn.textContent = 'Checking...';
     });
   }
 
@@ -338,10 +387,19 @@ function setupEventListeners() {
         reader.onload = (event) => {
           try {
             const data = JSON.parse(event.target.result);
+            if (!Array.isArray(data) || data.length === 0) {
+              throw new Error('Problem file must contain a non-empty array.');
+            }
             state.problems = data;
+            if (state.room && state.isMaster && !state.room.started) {
+              socket.emit('master:setProblems', {
+                roomCode: state.room.code,
+                problems: data
+              });
+            }
             renderAll();
           } catch (err) {
-            alert('Invalid JSON file.');
+            alert(err.message || 'Invalid JSON file.');
           }
         };
         reader.readAsText(file);
@@ -363,7 +421,10 @@ function setupEventListeners() {
   if (createRoomButton) {
     createRoomButton.addEventListener('click', () => {
       const timerMinutes = Number(timerInput.value) || 25;
-      socket.emit('master:createRoom', { timerMinutes });
+      socket.emit('master:createRoom', {
+        timerMinutes,
+        problems: state.problems
+      });
     });
   }
 
@@ -425,6 +486,9 @@ socket.on('room:created', (data) => {
 
 socket.on('room:state', (data) => {
   state.room = data;
+  if (Array.isArray(data.problems)) {
+    state.problems = data.problems;
+  }
   if (!state.isMaster && !state.currentPlayer && rollInput && data.players) {
     state.currentPlayer = data.players.find(
       player => player.roll.toLowerCase() === rollInput.value.trim().toLowerCase()
@@ -434,6 +498,13 @@ socket.on('room:state', (data) => {
     const updated = data.players.find(p => p.id === state.currentPlayer.id);
     if (updated) {
       state.currentPlayer = updated;
+    }
+  }
+  if (state.selectedProblem && state.currentPlayer) {
+    const submission = state.currentPlayer.submissions &&
+      state.currentPlayer.submissions[state.selectedProblem.id];
+    if (submission) {
+      renderSubmissionResult(submission);
     }
   }
   renderAll();
