@@ -1,3 +1,4 @@
 .vercel
+.firebase
 .env*
 node_modules/

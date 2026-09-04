@@ -53,6 +53,9 @@ function listenToRoom(roomCode) {
       emitLocal('room:error', { message: 'This room no longer exists.' });
       return;
     }
+    room.players = Array.isArray(room.players) ? room.players : Object.values(room.players || {});
+    room.problems = Array.isArray(room.problems) ? room.problems : Object.values(room.problems || {});
+    room.notifications = Array.isArray(room.notifications) ? room.notifications : Object.values(room.notifications || {});
     if (room.started && !room.ended) {
       room.countdown = Math.max(0, Number(room.timerMinutes) * 60 -
         Math.floor((Date.now() - Number(room.startedAt || Date.now())) / 1000));
@@ -89,54 +92,55 @@ function evaluateClientSubmission(problem, answer) {
     return String(answer).trim().toLowerCase() === String(problem.answer).trim().toLowerCase();
   }
 
-  async function runCodeAgainstTests(problem, code, language) {
-    const testCases = Array.isArray(problem.testCases) ? problem.testCases : [];
-    if (!testCases.length) {
-      return {
-        correct: evaluateClientSubmission(problem, code),
-        message: 'No test cases were supplied; answer pattern validation was used.',
-        passed: 0,
-        total: 0
-      };
-    }
-    const compiler = compilerVersions[language] || compilerVersions.javascript;
-    const results = [];
-    for (const testCase of testCases) {
-      const response = await fetch('https://emkc.org/api/v2/piston/execute', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          language: compiler[0],
-          version: compiler[1],
-          files: [{ content: code }],
-          stdin: String(testCase.input || '')
-        })
-      });
-      if (!response.ok) {
-        throw new Error(`Compiler service returned HTTP ${response.status}.`);
-      }
-      const result = await response.json();
-      const output = String(result.run && result.run.stdout || '').trim();
-      const expected = String(testCase.output ?? testCase.expectedOutput ?? '').trim();
-      results.push({
-        passed: output === expected,
-        expected,
-        actual: output,
-        stderr: String(result.run && result.run.stderr || '').trim()
-      });
-    }
-    return {
-      correct: results.every(result => result.passed),
-      message: `${results.filter(result => result.passed).length}/${results.length} test cases passed.`,
-      passed: results.filter(result => result.passed).length,
-      total: results.length,
-      results
-    };
-  }
   const normalizedAnswer = String(answer || '').replace(/\s+/g, ' ').trim().toLowerCase();
   const target = String(problem.answerSnippet || '').replace(/\s+/g, ' ').trim().toLowerCase();
   return Boolean(target && normalizedAnswer.includes(target)) ||
     normalizedAnswer.includes(String(problem.title || '').split(' ')[0].toLowerCase());
+}
+
+async function runCodeAgainstTests(problem, code, language) {
+  const testCases = Array.isArray(problem.testCases) ? problem.testCases : [];
+  if (!testCases.length) {
+    return {
+      correct: evaluateClientSubmission(problem, code),
+      message: 'No test cases were supplied; answer pattern validation was used.',
+      passed: 0,
+      total: 0
+    };
+  }
+  const compiler = compilerVersions[language] || compilerVersions.javascript;
+  const results = [];
+  for (const testCase of testCases) {
+    const response = await fetch('https://emkc.org/api/v2/piston/execute', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        language: compiler[0],
+        version: compiler[1],
+        files: [{ content: code }],
+        stdin: String(testCase.input || '')
+      })
+    });
+    if (!response.ok) {
+      throw new Error(`Compiler service returned HTTP ${response.status}.`);
+    }
+    const result = await response.json();
+    const output = String(result.run && result.run.stdout || '').trim();
+    const expected = String(testCase.output ?? testCase.expectedOutput ?? '').trim();
+    results.push({
+      passed: output === expected,
+      expected,
+      actual: output,
+      stderr: String(result.run && result.run.stderr || '').trim()
+    });
+  }
+  return {
+    correct: results.every(result => result.passed),
+    message: `${results.filter(result => result.passed).length}/${results.length} test cases passed.`,
+    passed: results.filter(result => result.passed).length,
+    total: results.length,
+    results
+  };
 }
 
 const socket = {
@@ -716,8 +720,12 @@ function setupEventListeners() {
       state.room = null;
       state.currentPlayer = null;
       state.isMaster = false;
-      socket.disconnect();
-      socket.connect();
+      localStorage.removeItem(playerSessionKey);
+      if (activeRoomRef && roomListener) {
+        activeRoomRef.off('value', roomListener);
+      }
+      activeRoomRef = null;
+      roomListener = null;
       renderAll();
     });
   }
@@ -798,6 +806,17 @@ document.addEventListener('DOMContentLoaded', async () => {
     if (firebaseSession.role === 'player') {
       rollInput.value = firebaseSession.roll || '';
       nameInput.value = firebaseSession.name || '';
+      state.currentPlayer = {
+        id: clientId,
+        name: firebaseSession.name || '',
+        roll: firebaseSession.roll || '',
+        score: 0,
+        solvedProblems: [],
+        submissions: {},
+        wrongAttempts: 0,
+        firstBloods: 0,
+        role: 'player'
+      };
     }
     listenToRoom(firebaseSession.roomCode);
   }
