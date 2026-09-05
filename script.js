@@ -127,11 +127,16 @@ async function runCodeAgainstTests(problem, code, language) {
     const result = await response.json();
     const output = String(result.run && result.run.stdout || '').trim();
     const expected = String(testCase.output ?? testCase.expectedOutput ?? '').trim();
+    const stderr = String(
+      result.compile && result.compile.stderr ||
+      result.run && result.run.stderr ||
+      ''
+    ).trim();
     results.push({
-      passed: output === expected,
+      passed: output === expected && !stderr,
       expected,
       actual: output,
-      stderr: String(result.run && result.run.stderr || '').trim()
+      stderr
     });
   }
   return {
@@ -270,6 +275,7 @@ let playerList, problemSidebar, problemMap, leaderboardList, notificationFeed, c
 let problemModal, problemTitle, problemText, problemContent, closeModalButton, submitBtn, resetButton;
 let problemStats, problemBreakdown, activeRoomCode, winnerTitle, winnerRanking;
 let joinCard;
+let terminalOutput, terminalStatus;
 
 function initializeUI() {
   adminView = document.getElementById('adminView');
@@ -311,6 +317,8 @@ function initializeUI() {
   closeModalButton = document.getElementById('closeModalButton');
   submitBtn = document.getElementById('submitBtn');
   resetButton = document.getElementById('resetButton');
+  terminalOutput = document.getElementById('terminalOutput');
+  terminalStatus = document.getElementById('terminalStatus');
 }
 
 // Load problems from problems.json
@@ -534,6 +542,25 @@ function renderSubmissionResult(submission) {
         ${submission.correct ? 'Correct answer' : 'Wrong answer'} · ${submission.message || languageNames[submission.language] || submission.language}
       </div>`);
   }
+
+  function setTerminalOutput(text, status = 'Ready', tone = '') {
+    if (terminalOutput) {
+      terminalOutput.className = tone;
+      terminalOutput.textContent = text;
+    }
+    if (terminalStatus) {
+      terminalStatus.textContent = status;
+      terminalStatus.className = tone;
+    }
+  }
+
+  function updateEditorLineNumbers() {
+    const editor = document.getElementById('codeInput');
+    const gutter = document.getElementById('editorLineNumbers');
+    if (!editor || !gutter) return;
+    const count = Math.max(1, editor.value.split('\n').length);
+    gutter.textContent = Array.from({ length: count }, (_, index) => index + 1).join('\n');
+  }
   submitBtn.disabled = Boolean(submission) || !state.currentPlayer;
   submitBtn.textContent = submission ? 'Completed' : 'Submit';
 }
@@ -556,20 +583,30 @@ function openProblemModal(problemId) {
       ).join('<br/>');
     } else if (problem.type === 'code' || problem.type === 'fill') {
       problemContent.innerHTML = 
-        `<label for="languageSelect">Language</label>
+        `<div class="ide-window">
+         <div class="ide-titlebar"><span class="ide-dot red"></span><span class="ide-dot yellow"></span><span class="ide-dot green"></span><span class="ide-title">solution.${problem.type === 'fill' ? 'txt' : 'code'}</span></div>
+         <div class="ide-tabbar"><span class="ide-tab active">${languageNames.javascript}</span></div>
+         <label class="ide-language-label" for="languageSelect">Language</label>
          <select id="languageSelect">
            <option value="javascript">JavaScript</option><option value="python">Python</option>
            <option value="java">Java</option><option value="cpp">C++</option><option value="c">C</option>
            <option value="csharp">C#</option><option value="go">Go</option><option value="rust">Rust</option>
            <option value="kotlin">Kotlin</option><option value="php">PHP</option>
          </select>
-         <pre id="starterCodePreview">${problem.starterCode || ''}</pre>
-         <textarea class="code-editor" id="codeInput" spellcheck="false">${problem.starterCode || ''}</textarea>`;
+         <div class="editor-frame">
+           <pre id="editorLineNumbers" class="editor-line-numbers">1</pre>
+           <textarea class="code-editor" id="codeInput" spellcheck="false">${problem.starterCode || ''}</textarea>
+         </div>
+         </div>`;
     } else {
       problemContent.textContent = problem.answerSnippet || 'Answer: ...';
     }
   }
   renderSubmissionResult(submission);
+  setTerminalOutput(submission ? `${submission.message || 'Submission completed.'}` : 'Run your solution to see output here.',
+    submission ? (submission.correct ? 'Passed' : 'Failed') : 'Ready',
+    submission ? (submission.correct ? 'terminal-success' : 'terminal-error') : '');
+  updateEditorLineNumbers();
   const languageSelect = document.getElementById('languageSelect');
   if (languageSelect) {
     if (submission && languageNames[submission.language]) {
@@ -577,10 +614,11 @@ function openProblemModal(problemId) {
     }
     languageSelect.addEventListener('change', () => {
       const code = starterCodeForLanguage(problem, languageSelect.value);
-      const preview = document.getElementById('starterCodePreview');
       const editor = document.getElementById('codeInput');
-      if (preview) preview.textContent = code;
       if (editor && !submission) editor.value = code;
+      const tab = document.querySelector('.ide-tab.active');
+      if (tab) tab.textContent = languageNames[languageSelect.value] || languageSelect.value;
+      updateEditorLineNumbers();
     });
   }
 
@@ -612,6 +650,7 @@ function setupEventListeners() {
       }
       submitBtn.disabled = true;
       submitBtn.textContent = 'Checking...';
+      setTerminalOutput(`> Running ${languageNames[language] || language} test cases...\n\n`, 'Running', 'terminal-running');
       let validation = {
         correct: evaluateClientSubmission(state.selectedProblem, answer),
         message: 'Answer checked.'
@@ -622,10 +661,20 @@ function setupEventListeners() {
         } catch (error) {
           submitBtn.disabled = false;
           submitBtn.textContent = 'Submit';
+          setTerminalOutput(error.message, 'Compilation error', 'terminal-error');
           problemContent.insertAdjacentHTML('afterbegin',
             `<div class="submission-result wrong">Compilation error · ${error.message}</div>`);
           return;
         }
+      }
+      if (validation.results) {
+        setTerminalOutput(validation.results.map((result, index) =>
+          `Test ${index + 1}: ${result.passed ? 'PASS' : 'FAIL'}\n  expected: ${result.expected}\n  received: ${result.actual}${result.stderr ? `\n  error: ${result.stderr}` : ''}`
+        ).join('\n\n'), validation.correct ? 'Passed' : 'Failed',
+        validation.correct ? 'terminal-success' : 'terminal-error');
+      } else {
+        setTerminalOutput(validation.message, validation.correct ? 'Passed' : 'Failed',
+          validation.correct ? 'terminal-success' : 'terminal-error');
       }
       socket.emit('problem:submit', {
         roomCode: state.room.code,
@@ -637,6 +686,10 @@ function setupEventListeners() {
       });
     });
   }
+
+  document.addEventListener('input', event => {
+    if (event.target && event.target.id === 'codeInput') updateEditorLineNumbers();
+  });
 
   if (timerInput) {
     timerInput.addEventListener('change', updateTimerDisplay);
